@@ -71,6 +71,7 @@ extern "C" {
 struct koti_nrf_header {
 	/* flags, bits:
 	 *  0-1: ttl, 2 bits
+	 *  2: acknowledge
 	 */
 	uint8_t flags;
 	uint8_t dst; /* receiver id */
