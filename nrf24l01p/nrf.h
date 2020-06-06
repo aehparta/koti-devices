@@ -84,7 +84,7 @@ struct koti_nrf_header {
 	uint8_t enc;
 	uint8_t crc; /* unencrypted payload crc-8 */
 
-	uint8_t x6;
+	uint8_t seq; /* sender specific sequence number */ 
 	uint8_t x7;
 };
 
