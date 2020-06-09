@@ -1,0 +1,16 @@
+
+menu "LED Controller Configuration"
+    config MQTT_PREFIX
+        string "MQTT topic prefix"
+        default "koti/devices/"
+    config MQTT_BROKER_URL
+        string "Broker URL (use mDNS if empty)"
+        help
+            URL of the broker to connect to, or empty to use mDNS
+    config MQTT_MDNS_SERVICE
+        string "mDNS service to query"
+        default "_mqtt"
+    config MQTT_MDNS_PROTO
+        string "mDNS proto to query"
+        default "_tcp"
+endmenu
