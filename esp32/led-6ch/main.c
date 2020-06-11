@@ -3,10 +3,11 @@
  */
 
 #include <libe/libe.h>
+#include <math.h>
 #include <esp_log.h>
 #include <mdns.h>
 #include <mqtt_client.h>
-#include <math.h>
+#include <driver/adc.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/event_groups.h>
@@ -37,6 +38,11 @@
 #define PWM_FREQUENCY               20000
 #define PWM_RESOLUTION              10
 
+/* adjust brightness down if temperature exceeds this level */
+#define TEMPERATURE_LIMIT           55
+
+
+esp_mqtt_client_handle_t mqtt_client;
 
 struct pwm pwm;
 
@@ -267,9 +273,9 @@ void mqtt_connect(void)
 			.username = CONFIG_MQTT_USERNAME,
 			.password = CONFIG_MQTT_PASSWORD
 		};
-		esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-		esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
-		esp_mqtt_client_start(client);
+		mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+		esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, mqtt_client);
+		esp_mqtt_client_start(mqtt_client);
 	} else {
 		/* try to resolve mqtt server*/
 		INFO_MSG("wifi connected, query mDNS to find mqtt server (%s.%s)", CONFIG_MQTT_MDNS_SERVICE, CONFIG_MQTT_MDNS_PROTO);
@@ -296,15 +302,17 @@ void mqtt_connect(void)
 			.username = CONFIG_MQTT_USERNAME,
 			.password = CONFIG_MQTT_PASSWORD
 		};
-		esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-		esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
-		esp_mqtt_client_start(client);
+		mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+		esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, mqtt_client);
+		esp_mqtt_client_start(mqtt_client);
 		free(host);
 	}
 }
 
 int app_main(int argc, char *argv[])
 {
+	char s_temp[128];
+
 	/* low level init: initializes some system basics depending on platform */
 	os_init();
 	/* debug/log init */
@@ -326,6 +334,10 @@ int app_main(int argc, char *argv[])
 		pwm_channel_enable(&pwm, i, ch[i].pin);
 	}
 
+	/* adc for temperature measurement, MCP9700A is connected to ADC1 channel 5 */
+	adc1_config_width(ADC_WIDTH_BIT_12);
+	adc1_config_channel_atten(ADC1_CHANNEL_5, ADC_ATTEN_DB_0);
+
 	/* event group for handling state changes */
 	event_group = xEventGroupCreate();
 
@@ -335,6 +347,7 @@ int app_main(int argc, char *argv[])
 #endif
 
 	/* start main application loop */
+	os_time_t adc_read_t = os_timef();
 	while (1) {
 		os_wdt_reset();
 
@@ -362,6 +375,63 @@ int app_main(int argc, char *argv[])
 			flasher = flasher >= 10 ? -9 : flasher + 1;
 		} else if (!(xEventGroupGetBits(event_group) & (MQTT_CONNECTED_BIT | MQTT_CONNECTING_BIT)) && wifi_connected()) {
 			mqtt_connect();
+		}
+
+		/* check temperature */
+		if (adc_read_t < os_timef()) {
+			static int t_send_counter = 0;
+			static float t_mean = 0;
+			/* this gets us a VERY rough reading without any calibration and noise cancellation */
+			float t_now = ((float)adc1_get_raw(ADC1_CHANNEL_5) / 4096.0 * 1.1 - 0.5) * 100.0;
+			t_mean += t_now;
+			adc_read_t += 1;
+			t_send_counter++;
+			if (t_send_counter >= 60) {
+				if (xEventGroupGetBits(event_group) & MQTT_CONNECTED_BIT) {
+					sprintf(s_temp, "%d", (int)(t_mean / (float)t_send_counter));
+					esp_mqtt_client_publish(mqtt_client, MQTT_PREFIX "/temperature", s_temp, 0, MQTT_QOS, MQTT_RETAIN);
+				}
+				t_send_counter = 0;
+				t_mean = 0;
+			}
+			/* check temperature each time around and adjust PWM values lower if needed */
+			if (t_now > TEMPERATURE_LIMIT) {
+				WARN_MSG("temperature over limit: %.0f°C > %.0f°C", t_now, TEMPERATURE_LIMIT);
+
+				/* each channel */
+				bool rgb0_changed = false, rgb1_changed = false;
+				for (int i = 0; i < 6; i++) {
+					/* skip if channel is off or at zero */
+					if (!ch[i].state || ch[i].value < 1) {
+						continue;
+					}
+					/* only send changed rgb channels later */
+					if (i < 3) {
+						rgb0_changed = true;
+					} else {
+						rgb1_changed = true;
+					}
+					/* decrease only by one since we are doing this once a second */
+					ch[i].value--;
+					char *topic = NULL;
+					asprintf(&topic, MQTT_PREFIX "/led%u/state", i);
+					sprintf(s_temp, "%u", ch[i].value);
+					esp_mqtt_client_publish(mqtt_client, topic, s_temp, 0, MQTT_QOS, MQTT_RETAIN);
+					free(topic);
+				}
+
+				/* first RGB channel */
+				if (rgb0_changed) {
+					sprintf(s_temp, "%u,%u,%u", ch[0].value, ch[1].value, ch[2].value);
+					esp_mqtt_client_publish(mqtt_client, MQTT_PREFIX "/rgb0/state", s_temp, 0, MQTT_QOS, MQTT_RETAIN);
+				}
+
+				/* second RGB channel */
+				if (rgb1_changed) {
+					sprintf(s_temp, "%u,%u,%u", ch[0].value, ch[1].value, ch[2].value);
+					esp_mqtt_client_publish(mqtt_client, MQTT_PREFIX "/rgb1/state", s_temp, 0, MQTT_QOS, MQTT_RETAIN);
+				}
+			}
 		}
 
 		/* we don't need that much cpu in the main loop */
