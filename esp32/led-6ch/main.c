@@ -40,6 +40,8 @@
 
 /* adjust brightness down if temperature exceeds this level */
 #define TEMPERATURE_LIMIT           55
+/* max temperature value that we can even detect */
+#define TEMPERATURE_MAX             60
 
 
 esp_mqtt_client_handle_t mqtt_client;
@@ -411,8 +413,8 @@ int app_main(int argc, char *argv[])
 					} else {
 						rgb1_changed = true;
 					}
-					/* decrease only by one since we are doing this once a second */
-					ch[i].value--;
+					/* decrease only by one if we are under maximum */
+					ch[i].value -= (t_now < TEMPERATURE_MAX ? 1 : 5);
 					char *topic = NULL;
 					asprintf(&topic, MQTT_PREFIX "/led%u/state", i);
 					sprintf(s_temp, "%u", ch[i].value);
