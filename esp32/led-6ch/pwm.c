@@ -7,7 +7,7 @@
 #include "pwm.h"
 
 
-int pwm_init(void)
+int pwm2_init(void)
 {
 	mcpwm_config_t cfg;
 
@@ -46,7 +46,7 @@ int pwm_init(void)
 	return 0;
 }
 
-void pwm_set_duty(int channel, float duty)
+void pwm2_set_duty(int channel, float duty)
 {
 	switch (channel) {
 	case 0:

@@ -7,6 +7,12 @@ menu "LED Controller Configuration"
         string "Broker URL (use mDNS if empty)"
         help
             URL of the broker to connect to, or empty to use mDNS
+    config MQTT_USERNAME
+        string "MQTT username"
+        default "koti"
+    config MQTT_PASSWORD
+        string "MQTT password"
+        default "koti1234"
     config MQTT_MDNS_SERVICE
         string "mDNS service to query"
         default "_mqtt"

@@ -1,6 +1,6 @@
 
 TARGET = ESP32
-USE += WIFI GPIO LOG
+USE += WIFI GPIO LOG PWM
 
 # init
 include $(LIBE_PATH)/init.mk
