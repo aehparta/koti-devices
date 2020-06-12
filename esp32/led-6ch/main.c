@@ -53,7 +53,8 @@ struct channel {
 	bool state;
 	uint8_t value;
 };
-struct channel ch[6] = { {2, 0, 0}, {4, 0, 0}, {18, 0, 0}, {23, 0, 0}, {19, 0, 0}, {22, 0, 0} };
+/* this setting is for chinese LED strips using GRB order */
+struct channel ch[6] = { {4, 0, 0}, {2, 0, 0}, {18, 0, 0}, {19, 0, 0}, {23, 0, 0}, {22, 0, 0} };
 
 static EventGroupHandle_t event_group;
 static const int MQTT_CONNECTED_BIT = BIT0;
