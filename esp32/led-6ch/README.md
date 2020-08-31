@@ -47,6 +47,7 @@ You need to connect ```RxD``` on the board to ```TxD``` and ```TxD``` on the boa
     * ```git clone https://github.com/aehparta/libe.git```
     * set ```LIBE_PATH``` environment value to point to libe root
         * as an example add ```export LIBE_PATH="$HOME/libe"``` to your ```~/.bashrc``` if you cloned libe to your home directory
+* `uuid` command (`apt install uuid`)
 
 ### Compile
 
@@ -55,5 +56,6 @@ This applies if you installed esp-idf with defaults:
 ```sh
 get_idf
 make menuconfig
+make uuid
 make flash monitor
 ```
