@@ -5,7 +5,7 @@
 #ifndef _KOTI_NRF_H_
 #define _KOTI_NRF_H_
 
-#include <libe/libe.h>
+#include <koti.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,8 +53,8 @@ extern "C" {
 #define KOTI_NRF_ENC_NONE               0x00
 #define KOTI_NRF_ENC_AES128             0x20
 #define KOTI_NRF_ENC_AES256             0x40
-#define KOTI_NRF_ENC_RES                0x60
-#define KOTI_NRF_ENC_RES                0x80
+#define KOTI_NRF_ENC_RES1               0x60
+#define KOTI_NRF_ENC_RES2               0x80
 /* Small target encryptions, need to do performance analysis compared to power usage in PIC16 and AVR.
  * Security-wise they are similar enough in my opinion. Still, RC5 is the least unsecure and most tested?
  */
@@ -85,10 +85,9 @@ struct koti_nrf_header {
 	uint8_t enc;
 	uint8_t crc; /* unencrypted payload crc-8 */
 
-	uint8_t seq; /* sender specific sequence number */ 
+	uint8_t seq; /* sender specific sequence number */
 	uint8_t x7;
 };
-
 
 /* payload structures */
 
@@ -103,7 +102,12 @@ struct koti_nrf_time {
 /* main packet structure */
 struct koti_nrf {
 	/* header */
-	struct koti_nrf_header header;
+	union {
+		struct koti_nrf_header header;
+		/* header as IV (initialization vector) */
+		uint8_t iv[8];
+	};
+
 	/* payload */
 	union {
 		/* as bytes */
@@ -134,6 +138,12 @@ struct koti_nrf_broadcast_uuid {
 
 /* IMPORTANT */
 #pragma pack()
+
+
+int8_t nrf24l01p_koti_init(struct nrf24l01p_device *nrf, struct spi_master *master, uint8_t ss, uint8_t ce);
+
+int8_t nrf24l01p_koti_recv(struct nrf24l01p_device *nrf, void *koti_nrf_packet);
+int8_t nrf24l01p_koti_send(struct nrf24l01p_device *nrf, void *koti_nrf_packet);
 
 
 #ifdef __cplusplus

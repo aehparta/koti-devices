@@ -62,6 +62,14 @@ int p_init(int argc, char *argv[])
 	/* full sleep mode */
 	IDLEN = 0;
 
+	/* disable almost all modules to save power */
+	PMD0 = 0x7f;
+	PMD1 = 0xfe;
+	PMD2 = 0xff;
+	PMD3 = 0xff;
+	PMD4 = 0xfd;
+	PMD5 = 0xff;
+
 	return 0;
 }
 

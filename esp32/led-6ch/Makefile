@@ -13,11 +13,9 @@ led6ch_SRC = main.c $(libe_SRC)
 # build
 include $(LIBE_PATH)/build.mk
 
-# (re-)generate device uuid
-UUID ?= $(shell uuid)
+# generate device uuid
 uuid:
-	@echo "#define DEVICE_UUID \"$(UUID)\"" > "device-uuid.h"
-	@convert -background white -fill black -font Arial -size 508x122 -pointsize 24 -gravity center label:$(UUID) device-uuid.png
+	UUID=$(shell uuid); echo "New UUID: $$UUID"; echo "$$UUID" > "device-uuid.txt"; echo "#define DEVICE_UUID \"$$UUID\"" > "device-uuid.h";
 
 # programmable targets
 include $(LIBE_PATH)/flash/program.mk
