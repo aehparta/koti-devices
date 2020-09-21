@@ -11,6 +11,10 @@
 extern "C" {
 #endif
 
+/* nrf24l01p settings */
+#define KOTI_NRF_CHANNEL                17
+#define KOTI_NRF_SPEED                  NRF24L01P_SPEED_2M
+
 /* basic nrf packet parts */
 #define KOTI_NRF_SIZE_HEADER            8
 #define KOTI_NRF_SIZE_PAYLOAD           24
@@ -100,7 +104,7 @@ struct koti_nrf_time {
 
 
 /* main packet structure */
-struct koti_nrf {
+struct koti_nrf_pck {
 	/* header */
 	union {
 		struct koti_nrf_header header;
@@ -121,7 +125,7 @@ struct koti_nrf {
 
 
 /* one way packet structure with embedded uuid */
-struct koti_nrf_broadcast_uuid {
+struct koti_nrf_pck_broadcast_uuid {
 	/* basic header structure */
 	struct koti_nrf_header header;
 	/* uuid */
@@ -140,10 +144,11 @@ struct koti_nrf_broadcast_uuid {
 #pragma pack()
 
 
-int8_t nrf24l01p_koti_init(struct nrf24l01p_device *nrf, struct spi_master *master, uint8_t ss, uint8_t ce);
+int8_t nrf24l01p_koti_init(struct spi_master *master, uint8_t ss, uint8_t ce);
+void nrf24l01p_koti_quit(void);
 
-int8_t nrf24l01p_koti_recv(struct nrf24l01p_device *nrf, void *koti_nrf_packet);
-int8_t nrf24l01p_koti_send(struct nrf24l01p_device *nrf, void *koti_nrf_packet);
+int8_t nrf24l01p_koti_recv(void *pck);
+int8_t nrf24l01p_koti_send(void *pck);
 
 
 #ifdef __cplusplus

@@ -1,6 +1,6 @@
 
 TARGET = X86
-USE += LOG LOG_COLORS SPI GPIO #DRIVER_NRF24L01P
+USE += LOG LOG_COLORS SPI GPIO DRIVER_NRF24L01P
 USE_X86 += FTDI BROADCAST
 
 DEFINES_X86 += FTDI_VID=0 FTDI_PID=0 FTDI_DESC=NULL FTDI_SERIAL=NULL
@@ -11,9 +11,9 @@ DEFINES_X86 += NRF_SS=3 NRF_CE=4
 include $(KOTI_PATH)/init.mk
 
 # our own sources etc
-BUILD_BINS = mosquitto koti-bridge-nrf24l01p
-PROGRAM_BIN = koti-bridge-nrf24l01p
-koti-bridge-nrf24l01p_SRC = main.c mqtt.c $(libe_SRC) $(koti_nrf_SRC)
+BUILD_BINS = testing
+PROGRAM_BIN = testing
+testing_SRC = main.c $(libe_SRC) $(koti_nrf_SRC)
 
 # build
 include $(KOTI_PATH)/build.mk
