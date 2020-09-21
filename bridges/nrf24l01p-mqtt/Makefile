@@ -13,7 +13,7 @@ include $(KOTI_PATH)/init.mk
 # our own sources etc
 BUILD_BINS = mosquitto koti-bridge-nrf24l01p
 PROGRAM_BIN = koti-bridge-nrf24l01p
-koti-bridge-nrf24l01p_SRC = main.c mqtt.c $(libe_SRC) $(koti_nrf_SRC)
+koti-bridge-nrf24l01p_SRC = main.c mqtt.c $(libe_SRC) $(koti_nrf_SRC) $(koti_opt_SRC)
 
 # build
 include $(KOTI_PATH)/build.mk

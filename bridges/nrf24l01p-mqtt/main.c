@@ -5,6 +5,28 @@
 #include <koti.h>
 
 
+/* command line options */
+struct opt_option opt_all[] = {
+	{ 'h', "help", no_argument, 0, NULL, NULL, "display this help and exit", { 0 } },
+
+	/* influxdb server */
+	{
+		'i', "influxdb-ip", required_argument, 0, "127.0.0.1", NULL,
+		"remote InfluxDB server host IP address\n"
+		"(hostname not accepted, I was too lazy to implement resolve here)\n"
+		"this is for sending data through UDP, see InfluxDB UDP support for more"
+		, { OPT_FILTER_INT, 1, 65535 }
+	},
+	{ 'p', "influxdb-port", required_argument, 0, "8089", NULL, "remote InfluxDB UDP receive port", { OPT_FILTER_INT, 1, 65535 } },
+
+	/* http server */
+	{ 'P', "http-port", required_argument, 0, "80", NULL, "internal http daemon port", { OPT_FILTER_INT, 1, 65535 } },
+	{ 'D', "html", required_argument, 0, "./web", NULL, "internal http daemon public html directory", { 0 } },
+
+	{ 0, 0, 0, 0, 0, 0, 0, { 0 } }
+};
+
+/* global for spi master */
 struct spi_master master;
 
 
@@ -53,6 +75,9 @@ int app_main(int argc, char *argv[])
 int main(int argc, char *argv[])
 #endif
 {
+	/* parse options */
+	IF_R(opt_init(opt_all, NULL, NULL, NULL) || opt_parse(argc, argv), EXIT_FAILURE);
+
 	/* init */
 	if (p_init(argc, argv)) {
 		ERROR_MSG("initialization failed");

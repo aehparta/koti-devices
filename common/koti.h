@@ -13,6 +13,7 @@ extern "C" {
 
 #define KOTI_BROADCAST_PORT     17117
 
+#include "opt.h"
 #include "nrf24l01p/nrf.h"
 
 #ifdef __cplusplus
