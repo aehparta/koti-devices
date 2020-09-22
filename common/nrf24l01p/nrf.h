@@ -22,10 +22,11 @@ extern "C" {
 
 
 /* broadcast ID */
-#define KOTI_NRF_ID_BROADCAST           0xff
-/* sender id for a data packet that contains uuid */
-#define KOTI_NRF_ID_UUID                0xfe
-
+#define KOTI_NRF_ID_BROADCAST           0x00
+/* used to send packets to bridges only */
+#define KOTI_NRF_ID_BRIDGE              0x01
+/* sender id for a data packet that contains uuid (device has no valid id or does not even use one) */
+#define KOTI_NRF_ID_UUID                0x02
 
 /* nrf packet types (0-127) */
 #define KOTI_NRF_HELLO                  0
@@ -53,19 +54,24 @@ extern "C" {
 /* nrf packet flags */
 #define KOTI_NRF_FLAG_TTL_MASK          0x03
 
+/* ack flag */
+#define KOTI_NRF_ACK_BIT                0x04
+
 /* encryption */
-#define KOTI_NRF_ENC_NONE               0x00
-#define KOTI_NRF_ENC_AES128             0x20
-#define KOTI_NRF_ENC_AES256             0x40
-#define KOTI_NRF_ENC_RES1               0x60
-#define KOTI_NRF_ENC_RES2               0x80
-/* Small target encryptions, need to do performance analysis compared to power usage in PIC16 and AVR.
- * Security-wise they are similar enough in my opinion. Still, RC5 is the least unsecure and most tested?
+/* RC5 is for small target encryptions.
+ * Security-wise it is quite well tested and pretty much enough for most IOT stuff.
+ * (should do performance analysis compared to power usage in 8-bit PICs and AVR)
  */
-#define KOTI_NRF_ENC_RC5                0xa0 /* RC5 is the strongest candidate for small target encryption */
-#define KOTI_NRF_ENC_XTEA               0xc0 /* or maybe XTEA */
-#define KOTI_NRF_ENC_XXTEA              0xe0 /* XXTEA is probably the next one after RC5 */
-#define KOTI_NRF_ENC_MASK               0xe0
+#define KOTI_NRF_ENC_RC5                0x00
+#define KOTI_NRF_ENC_AES128             0x40
+#define KOTI_NRF_ENC_AES256             0x80
+#define KOTI_NRF_ENC_NONE               0xc0
+#define KOTI_NRF_ENC_MASK               0xc0
+
+#define KOTI_NRF_ENC_BLOCKS_1           0x00
+#define KOTI_NRF_ENC_BLOCKS_2           0x10
+#define KOTI_NRF_ENC_BLOCKS_3           0x20
+#define KOTI_NRF_ENC_BLOCKS_MASK        0x30
 
 
 /* IMPORTANT */
@@ -73,24 +79,37 @@ extern "C" {
 
 /* basic header structure */
 struct koti_nrf_header {
+	union {
+		struct {
+			/* receiver id */
+			uint8_t to;
+			/* sender id */
+			uint8_t from;
+			/* sender specific incremental sequence number */
+			uint8_t seq;
+			/* this is to make header use as iv better and also to make id more unique */
+			uint8_t iv_rand;
+		};
+		/* unique packet id used for forwarding single packet only once, consist all fields from struct above */
+		uint32_t id;
+	};
+
 	/* flags, bits:
-	 *  0-1: ttl, 2 bits
+	 *  0-1: ttl, 2 bits (must be zero when using header as iv)
 	 *  2: acknowledge
+	 *  4-5: 8-byte blocks of payload encrypted (0: first block only, 1: first 2 blocks, 2 or 3: all of it)
+	 *  6-7: encryption used
 	 */
 	uint8_t flags;
-	uint8_t dst; /* receiver id */
-	uint8_t src; /* sender id */
-	uint8_t type; /* packet type */
 
-	/* encryption, bits:
-	 *  0-4: bytes of payload encrypted
-	 *  5-7: encryption used, 3 bits
-	 */
-	uint8_t enc;
-	uint8_t crc; /* unencrypted payload crc-8 */
+	/* packet type */
+	uint8_t type;
 
-	uint8_t seq; /* sender specific sequence number */
-	uint8_t x7;
+	/* reserved */
+	uint8_t res1;
+
+	/* unencrypted payload crc-8 */
+	uint8_t crc;
 };
 
 /* payload structures */
@@ -107,11 +126,10 @@ struct koti_nrf_time {
 struct koti_nrf_pck {
 	/* header */
 	union {
-		struct koti_nrf_header header;
+		struct koti_nrf_header hdr;
 		/* header as IV (initialization vector) */
 		uint8_t iv[8];
 	};
-
 	/* payload */
 	union {
 		/* as bytes */
@@ -126,10 +144,12 @@ struct koti_nrf_pck {
 
 /* one way packet structure with embedded uuid */
 struct koti_nrf_pck_broadcast_uuid {
-	/* basic header structure */
-	struct koti_nrf_header header;
-	/* uuid */
-	uint8_t uuid[16];
+	/* header */
+	union {
+		struct koti_nrf_header hdr;
+		/* header as IV (initialization vector) */
+		uint8_t iv[8];
+	};
 	/* payload */
 	union {
 		/* as bytes */
@@ -137,6 +157,8 @@ struct koti_nrf_pck_broadcast_uuid {
 		/* two floats */
 		float f32[2];
 	};
+	/* uuid */
+	uint8_t uuid[16];
 };
 
 
@@ -147,8 +169,10 @@ struct koti_nrf_pck_broadcast_uuid {
 int8_t nrf24l01p_koti_init(struct spi_master *master, uint8_t ss, uint8_t ce);
 void nrf24l01p_koti_quit(void);
 
+void nrf24l01p_koti_set_key(uint8_t *key, uint8_t size);
+
 int8_t nrf24l01p_koti_recv(void *pck);
-int8_t nrf24l01p_koti_send(void *pck);
+int8_t nrf24l01p_koti_send(uint8_t to, uint8_t from, void *pck);
 
 
 #ifdef __cplusplus

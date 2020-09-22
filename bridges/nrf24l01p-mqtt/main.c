@@ -9,19 +9,10 @@
 struct opt_option opt_all[] = {
 	{ 'h', "help", no_argument, 0, NULL, NULL, "display this help and exit", { 0 } },
 
-	/* influxdb server */
-	{
-		'i', "influxdb-ip", required_argument, 0, "127.0.0.1", NULL,
-		"remote InfluxDB server host IP address\n"
-		"(hostname not accepted, I was too lazy to implement resolve here)\n"
-		"this is for sending data through UDP, see InfluxDB UDP support for more"
-		, { OPT_FILTER_INT, 1, 65535 }
-	},
-	{ 'p', "influxdb-port", required_argument, 0, "8089", NULL, "remote InfluxDB UDP receive port", { OPT_FILTER_INT, 1, 65535 } },
-
-	/* http server */
-	{ 'P', "http-port", required_argument, 0, "80", NULL, "internal http daemon port", { OPT_FILTER_INT, 1, 65535 } },
-	{ 'D', "html", required_argument, 0, "./web", NULL, "internal http daemon public html directory", { 0 } },
+	/* mqtt server */
+	{ 'H', "mqtt-host", required_argument, 0, "localhost", NULL, "mqtt server hostname", { 0 } },
+	{ 'P', "mqtt-port", required_argument, 0, "1883", NULL, "mqtt server port", { OPT_FILTER_INT, 1, 65535 } },
+	{ 'X', "mqtt-prefix", required_argument, 0, NULL, NULL, "mqtt topic prefix", { 0 } },
 
 	{ 0, 0, 0, 0, 0, 0, 0, { 0 } }
 };
@@ -56,6 +47,7 @@ int p_init(int argc, char *argv[])
 
 	/* nrf initialization */
 	ERROR_IF_R(nrf24l01p_koti_init(&master, NRF_SS, NRF_CE), -1, "nrf24l01+ failed to initialize");
+	nrf24l01p_koti_set_key((uint8_t *)"12345678", 8);
 
 	return 0;
 }
@@ -102,6 +94,7 @@ int main(int argc, char *argv[])
 		} else if (ok > 0) {
 			DEBUG_MSG("got packet");
 			HEX_DUMP(&pck, sizeof(pck), 1);
+			ASCII_DUMP(&pck, sizeof(pck), 0);
 		}
 
 		/* lets not waste all cpu */

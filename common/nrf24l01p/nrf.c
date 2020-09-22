@@ -6,6 +6,10 @@
 struct nrf24l01p_device nrf;
 #endif
 
+/* RC5 context */
+static rc5_context_t rc5;
+/* sequence number for packets we send */
+static uint8_t sequence;
 
 int8_t nrf24l01p_koti_init(struct spi_master *master, uint8_t ss, uint8_t ce)
 {
@@ -23,13 +27,15 @@ int8_t nrf24l01p_koti_init(struct spi_master *master, uint8_t ss, uint8_t ce)
 	DEBUG_MSG("using nrf24l01p");
 #endif
 
-#ifdef USE_BROADCAST
+#ifdef USE_BROADCAST /* lan broadcast driver for testing purposes */
 	if (broadcast_init(KOTI_BROADCAST_PORT)) {
 		ERROR_MSG("failed to initialize koti development broadcast on port %d", KOTI_BROADCAST_PORT);
 	} else {
 		DEBUG_MSG("using broadcast on port %d for development purposes", KOTI_BROADCAST_PORT);
 	}
 #endif
+
+	sequence = 0;
 
 	return 0;
 }
@@ -39,37 +45,145 @@ void nrf24l01p_koti_quit(void)
 #ifdef USE_DRIVER_NRF24L01P
 	nrf24l01p_close(&nrf);
 #endif
-#ifdef USE_BROADCAST
+#ifdef USE_BROADCAST /* lan broadcast driver for testing purposes */
 	broadcast_quit();
 #endif
 }
 
-int8_t nrf24l01p_koti_recv(void *pck)
+void nrf24l01p_koti_set_key(uint8_t *key, uint8_t size)
 {
-#ifdef USE_DRIVER_NRF24L01P
-	int8_t n = nrf24l01p_recv(&nrf, pck);
-	if (n > 0) {
-		return n;
-	}
-	// ERROR_IF(n < 0, "nrf24l01p recv failed");
+#ifdef USE_AES
+	uint8_t k[32];
+#else
+	/* on smaller platforms only RC5 is used, so key is 16 bytes at max */
+	uint8_t k[16];
 #endif
-
-#ifdef USE_BROADCAST
-	return broadcast_recv(pck, sizeof(struct koti_nrf_pck));
+	memset(k, 0, sizeof(k));
+	memcpy(k, key, size);
+	rc5_init(&rc5, k);
+#ifdef USE_AES
+	/* implement */
 #endif
-
-	return 0;
 }
 
-int8_t nrf24l01p_koti_send(void *pck)
+int8_t nrf24l01p_koti_recv(void *p)
 {
+	struct koti_nrf_pck *pck = p;
 	int8_t n = 0;
 
 #ifdef USE_DRIVER_NRF24L01P
+	n = nrf24l01p_recv(&nrf, pck);
+	// ERROR_IF(n < 0, "nrf24l01p recv failed");
 #endif
 
-#ifdef USE_BROADCAST
-	broadcast_send(pck, sizeof(struct koti_nrf_pck));
+#ifdef USE_BROADCAST /* lan broadcast driver for testing purposes */
+	if (n < 1) {
+		n = broadcast_recv(pck, sizeof(*pck));
+	}
+#endif
+
+	/* return if no data or an error occured */
+	if (n < 1) {
+		return n;
+	}
+
+	/* clear ttl for possible encryption iv usage */
+	pck->hdr.flags &= ~KOTI_NRF_FLAG_TTL_MASK;
+
+	/* encryption being zero is same as RC5 */
+	if (!(pck->hdr.flags & KOTI_NRF_ENC_MASK)) {
+		/* third block: only if second bit is set */
+		if (pck->hdr.flags & KOTI_NRF_ENC_BLOCKS_3) {
+			rc5_decrypt(&rc5, pck->data + 16);
+			for (uint8_t i = 8; i < 16; i++) {
+				/* de-apply iv */
+				pck->data[i + 8] ^= pck->data[i];
+			}
+		}
+		/* second block: always if more than first block should be encrypted */
+		if (pck->hdr.flags & KOTI_NRF_ENC_BLOCKS_MASK) {
+			rc5_decrypt(&rc5, pck->data + 8);
+			for (uint8_t i = 0; i < 8; i++) {
+				/* apply iv */
+				pck->data[i + 8] ^= pck->data[i];
+			}
+		}
+		/* first block */
+		rc5_decrypt(&rc5, pck->data);
+		for (uint8_t i = 0; i < 8; i++) {
+			/* de-apply iv */
+			pck->data[i] ^= pck->iv[i];
+		}
+	}
+
+	/* calculate crc */
+	uint8_t crc = crc8_dallas(pck->data, KOTI_NRF_SIZE_PAYLOAD);
+	if (crc != pck->hdr.crc) {
+		DEBUG_MSG("crc missmatch");
+		return 0;
+	}
+
+	return n;
+}
+
+int8_t nrf24l01p_koti_send(uint8_t to, uint8_t from, void *p)
+{
+	struct koti_nrf_pck *pck = p;
+	int8_t n = 0;
+
+	/* set to and from */
+	pck->hdr.to = to;
+	pck->hdr.from = from;
+
+	/* clear ttl for possible encryption iv usage */
+	pck->hdr.flags &= ~KOTI_NRF_FLAG_TTL_MASK;
+
+	/* set sequence number and increase it, this is mostly to make encryption iv change always */
+	pck->hdr.seq = sequence++;
+
+	/* also set random number to further randomize header as iv */
+	pck->hdr.iv_rand = rand();
+
+	/* calculate crc */
+	pck->hdr.crc = crc8_dallas(pck->data, KOTI_NRF_SIZE_PAYLOAD);
+
+	/* encryption being zero is same as RC5 */
+	if (!(pck->hdr.flags & KOTI_NRF_ENC_MASK)) {
+		/* first block */
+		for (uint8_t i = 0; i < 8; i++) {
+			/* apply iv */
+			pck->data[i] ^= pck->iv[i];
+		}
+		rc5_encrypt(&rc5, pck->data);
+		/* second block: always if more than first block should be encrypted */
+		if (pck->hdr.flags & KOTI_NRF_ENC_BLOCKS_MASK) {
+			for (uint8_t i = 0; i < 8; i++) {
+				/* apply iv */
+				pck->data[i + 8] ^= pck->data[i];
+			}
+			rc5_encrypt(&rc5, pck->data + 8);
+		}
+		/* third block: only if second bit is set */
+		if (pck->hdr.flags & KOTI_NRF_ENC_BLOCKS_3) {
+			for (uint8_t i = 8; i < 16; i++) {
+				/* apply iv */
+				pck->data[i + 8] ^= pck->data[i];
+			}
+			rc5_encrypt(&rc5, pck->data + 16);
+		}
+	}
+#ifdef USE_AES
+	/* implement aes */
+#endif
+
+	/* set max ttl for now */
+	pck->hdr.flags |= KOTI_NRF_FLAG_TTL_MASK;
+
+#ifdef USE_DRIVER_NRF24L01P
+#endif
+
+#ifdef USE_BROADCAST /* lan broadcast driver for testing purposes */
+	broadcast_send(pck, sizeof(*pck));
 #endif
 
 	return n;

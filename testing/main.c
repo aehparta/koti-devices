@@ -34,6 +34,7 @@ int p_init(int argc, char *argv[])
 
 	/* nrf initialization */
 	ERROR_IF_R(nrf24l01p_koti_init(&master, NRF_SS, NRF_CE), -1, "nrf24l01+ failed to initialize");
+	nrf24l01p_koti_set_key((uint8_t *)"12345678", 8);
 
 	return 0;
 }
@@ -68,10 +69,16 @@ int main(int argc, char *argv[])
 		os_wdt_reset();
 
 		memset(&pck, 0, sizeof(pck));
-		nrf24l01p_koti_send(&pck);
+		memcpy(pck.data, "123456789abcdef", 16);
+		pck.hdr.flags |= KOTI_NRF_ENC_BLOCKS_2;
+
+		DEBUG_MSG("sending packet");
+		nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
+		HEX_DUMP(&pck, sizeof(pck), 1);
+		ASCII_DUMP(&pck, sizeof(pck), 0);
 
 		/* lets not waste all cpu */
-		os_sleepf(1);
+		os_sleepf(2);
 	}
 
 	p_exit(EXIT_SUCCESS);
