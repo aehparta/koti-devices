@@ -3,6 +3,7 @@
  */
 
 #include <koti.h>
+#include "mqtt.h"
 
 
 /* command line options */
@@ -48,6 +49,10 @@ int p_init(int argc, char *argv[])
 	/* nrf initialization */
 	ERROR_IF_R(nrf24l01p_koti_init(&master, NRF_SS, NRF_CE), -1, "nrf24l01+ failed to initialize");
 	nrf24l01p_koti_set_key((uint8_t *)"12345678", 8);
+
+	/* mqtt initialization and connect */
+	ERROR_IF_R(mqtt_init(), -1, "mqtt initialization failed");
+	ERROR_IF_R(mqtt_connect(opt_get('H'), opt_get_int('P')), -1, "mqtt connect to server failed");
 
 	return 0;
 }
