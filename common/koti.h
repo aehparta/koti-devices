@@ -13,7 +13,9 @@ extern "C" {
 
 #define KOTI_BROADCAST_PORT     17117
 
+#ifdef TARGET_LINUX
 #include "opt.h"
+#endif
 #include "nrf24l01p/nrf.h"
 
 #ifdef __cplusplus

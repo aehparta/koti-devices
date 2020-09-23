@@ -1,0 +1,16 @@
+jsmn/*
+sdkconfig*
+.build.*
+*.elf
+*.o
+*.d
+*.p1
+*.rlf
+*.lst
+*PIC8.cmf
+*PIC8.hxl
+*PIC8.sdb
+*PIC8.sym
+*PIC8.hex
+*PIC8.s
+
