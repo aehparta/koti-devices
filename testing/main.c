@@ -74,6 +74,7 @@ int main(int argc, char *argv[])
 
 		DEBUG_MSG("sending packet");
 		nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
+
 		HEX_DUMP(&pck, sizeof(pck), 1);
 		ASCII_DUMP(&pck, sizeof(pck), 0);
 

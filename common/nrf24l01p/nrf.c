@@ -20,10 +20,21 @@ int8_t nrf24l01p_koti_init(struct spi_master *master, uint8_t ss, uint8_t ce)
 	nrf24l01p_set_channel(&nrf, KOTI_NRF_CHANNEL);
 	/* change speed, default is 250k */
 	nrf24l01p_set_speed(&nrf, KOTI_NRF_SPEED);
+
+#ifdef USE_KOTI_NRF_LOW_POWER
+	/* set radio to the lowest setting */
+	// nrf24l01p_set_tx_power(&nrf, NRF24L01P_POWER_LOW);
+	/* set radio in send mode and put it in standy to save power */
+	nrf24l01p_mode_tx(&nrf);
+	nrf24l01p_set_standby(&nrf, true);
+	nrf24l01p_set_power_down(&nrf, true);
+#else
 	/* set radio in listen mode */
-	nrf24l01p_flush_rx(&nrf);
-	/* enable radio */
-	// nrf24l01p_set_standby(&nrf, false);
+	nrf24l01p_set_standby(&nrf, true);
+	nrf24l01p_mode_rx(&nrf);
+	nrf24l01p_set_standby(&nrf, false);
+#endif
+
 	DEBUG_MSG("using nrf24l01p");
 #endif
 
@@ -73,7 +84,7 @@ int8_t nrf24l01p_koti_recv(void *p)
 
 #ifdef USE_DRIVER_NRF24L01P
 	n = nrf24l01p_recv(&nrf, pck);
-	// ERROR_IF(n < 0, "nrf24l01p recv failed");
+	ERROR_IF(n < 0, "nrf24l01p recv failed");
 #endif
 
 #ifdef USE_BROADCAST /* lan broadcast driver for testing purposes */
@@ -142,7 +153,7 @@ int8_t nrf24l01p_koti_send(uint8_t to, uint8_t from, void *p)
 	pck->hdr.seq = sequence++;
 
 	/* also set random number to further randomize header as iv */
-	pck->hdr.iv_rand = rand();
+	pck->hdr.iv_rand = (uint8_t)rand();
 
 	/* calculate crc */
 	pck->hdr.crc = crc8_dallas(pck->data, KOTI_NRF_SIZE_PAYLOAD);
@@ -180,6 +191,26 @@ int8_t nrf24l01p_koti_send(uint8_t to, uint8_t from, void *p)
 	pck->hdr.flags |= KOTI_NRF_FLAG_TTL_MASK;
 
 #ifdef USE_DRIVER_NRF24L01P
+#ifdef USE_KOTI_NRF_LOW_POWER
+	/* switch power on */
+	nrf24l01p_set_power_down(&nrf, false);
+	/* write tx buffer */
+	nrf24l01p_tx_wr(&nrf, pck);
+	/* enable radio */
+	nrf24l01p_set_standby(&nrf, false);
+	/* wait data to be transmitted */
+	while (!(nrf24l01p_read_status(&nrf) & 0x20));
+	/* disable radio */
+	nrf24l01p_set_standby(&nrf, true);
+	/* clear sent bit (why we need to flush?) */
+	// nrf24l01p_write_reg(&nrf, NRF24L01P_REG_STATUS, 0x20);
+	nrf24l01p_flush_tx(&nrf);
+	/* power down */
+	nrf24l01p_set_power_down(&nrf, true);
+#else
+	/* use nrf24l01p_send() which automatically keeps radio on and switches back to listen mode */
+	nrf24l01p_send(&nrf, pck);
+#endif
 #endif
 
 #ifdef USE_BROADCAST /* lan broadcast driver for testing purposes */

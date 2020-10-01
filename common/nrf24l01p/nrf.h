@@ -13,7 +13,7 @@ extern "C" {
 
 /* nrf24l01p settings */
 #define KOTI_NRF_CHANNEL                17
-#define KOTI_NRF_SPEED                  NRF24L01P_SPEED_2M
+#define KOTI_NRF_SPEED                  NRF24L01P_SPEED_250k
 
 /* basic nrf packet parts */
 #define KOTI_NRF_SIZE_HEADER            8
@@ -136,6 +136,10 @@ struct koti_nrf_pck {
 		uint8_t data[KOTI_NRF_SIZE_PAYLOAD];
 		/* six floats */
 		float f32[6];
+		/* 32-bit unsigned ints */
+		uint32_t u32[6];
+		/* 64-bit unsigned ints */
+		uint64_t u64[3];
 		/* time */
 		struct koti_nrf_time time;
 	};
@@ -156,6 +160,10 @@ struct koti_nrf_pck_broadcast_uuid {
 		uint8_t data[8];
 		/* two floats */
 		float f32[2];
+		/* two 32 bit unsigned ints */
+		uint32_t u32[2];
+		/* 64-bit unsigned int */
+		uint64_t u64;
 	};
 	/* uuid */
 	uint8_t uuid[16];
