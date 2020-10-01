@@ -80,7 +80,6 @@ void p_init(void)
 	PMD5 = 0xff;
 
 	/* Timer0 wakes up the cpu once and a while */
-	// RA5PPS = 0x1c;
 	TMR0L = 0;
 	TMR0H = SLOW_TIMER; /* with 1:8 prescaler this makes 20Hz (50 ms intervals) */
 	T0CON1 = 0x93; /* LFINTOSC and async, 1:8 prescaler */
