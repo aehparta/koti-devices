@@ -1,0 +1,3 @@
+
+COMPONENT_SRCDIRS = common common/nrf24l01p
+COMPONENT_ADD_INCLUDEDIRS = common

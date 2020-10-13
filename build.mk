@@ -1,4 +1,8 @@
 
+ifeq ($(TARGET),ESP32)
+	EXTRA_COMPONENT_DIRS += $(KOTI_PATH)
+endif
+
 include $(LIBE_PATH)/build.mk
 
 mosquitto:
