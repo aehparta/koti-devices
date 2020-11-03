@@ -4,11 +4,13 @@
 
 #include <koti.h>
 
+#ifdef MCU_PIC16LF18345
 #pragma config FEXTOSC = OFF
-#pragma config WDTE = OFF
 #pragma config DEBUG = OFF
-#pragma config BOREN = OFF
 #pragma config LPBOREN = OFF
+#endif
+#pragma config WDTE = OFF
+#pragma config BOREN = OFF
 
 
 #define HALL_PIN_EN     GPIOC0
@@ -68,6 +70,7 @@ void p_init(void)
 	gpio_output(GPIOC7);
 	gpio_high(GPIOC7);
 
+#ifdef MCU_PIC16LF18345
 	/* full sleep mode */
 	IDLEN = 0;
 
@@ -85,6 +88,7 @@ void p_init(void)
 	T0CON1 = 0x93; /* LFINTOSC and async, 1:8 prescaler */
 	T0CON0 = 0x80; /* enable timer as 8-bit, no postscaler */
 	PIE0bits.TMR0IE = 1;
+#endif
 
 	/* enable interrupts globally */
 	// INTCONbits.GIE = 1;
@@ -106,7 +110,9 @@ void main(void)
 
 	while (1) {
 		SLEEP();
+#ifdef MCU_PIC16LF18345
 		PIR0bits.TMR0IF = 0;
+#endif
 
 		/* read hall */
 		uint8_t hall_now = gpio_read(HALL_PIN_READ);
@@ -120,16 +126,21 @@ void main(void)
 			hall_last = hall_now;
 			hall_ticks++;
 
+#ifdef MCU_PIC16LF18345
 			if (!hall_changed) {
 				TMR0H = FAST_TIMER;
 			}
+#endif
+
 			/* wait a while for things to cool down */
 			hall_changed = HALL_DELAY * HALL_FAST_HZ;
 		} else if (hall_changed) {
 			hall_changed--;
 			if (!hall_changed) {
+#ifdef MCU_PIC16LF18345
 				/* back to slow playing */
 				TMR0H = SLOW_TIMER;
+#endif
 				/* send shortly after no changes in hall */
 				send_timer = HALL_DELAY * HALL_SLOW_HZ;
 			}
