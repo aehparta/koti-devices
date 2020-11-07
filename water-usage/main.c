@@ -4,11 +4,17 @@
 
 #include <koti.h>
 
-#ifdef MCU_PIC16LF18345
+#if defined(MCU_PIC16LF18345)
 #pragma config FEXTOSC = OFF
 #pragma config DEBUG = OFF
 #pragma config LPBOREN = OFF
 #endif
+
+#if defined(MCU_PIC16LF18446)
+#pragma config FEXTOSC = OFF
+#pragma config LPBOREN = OFF
+#endif
+
 #pragma config WDTE = OFF
 #pragma config BOREN = OFF
 
@@ -70,7 +76,7 @@ void p_init(void)
 	gpio_output(GPIOC7);
 	gpio_high(GPIOC7);
 
-#ifdef MCU_PIC16LF18345
+#if defined(MCU_PIC16LF18345) || defined(MCU_PIC16LF18446)
 	/* full sleep mode */
 	IDLEN = 0;
 
@@ -110,7 +116,7 @@ void main(void)
 
 	while (1) {
 		SLEEP();
-#ifdef MCU_PIC16LF18345
+#if defined(MCU_PIC16LF18345) || defined(MCU_PIC16LF18446)
 		PIR0bits.TMR0IF = 0;
 #endif
 
@@ -126,7 +132,7 @@ void main(void)
 			hall_last = hall_now;
 			hall_ticks++;
 
-#ifdef MCU_PIC16LF18345
+#if defined(MCU_PIC16LF18345) || defined(MCU_PIC16LF18446)
 			if (!hall_changed) {
 				TMR0H = FAST_TIMER;
 			}
@@ -137,7 +143,7 @@ void main(void)
 		} else if (hall_changed) {
 			hall_changed--;
 			if (!hall_changed) {
-#ifdef MCU_PIC16LF18345
+#if defined(MCU_PIC16LF18345) || defined(MCU_PIC16LF18446)
 				/* back to slow playing */
 				TMR0H = SLOW_TIMER;
 #endif
