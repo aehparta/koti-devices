@@ -46,7 +46,7 @@ void p_init(void)
 	gpio_high(HALL_PIN_EN);
 	gpio_input(HALL_PIN_READ);
 
-	/* all other gpios as output and high */
+	/* all other gpios as output and high to save power */
 	gpio_output(GPIOA0);
 	gpio_high(GPIOA0);
 	gpio_output(GPIOA1);
@@ -137,8 +137,8 @@ void main(void)
 			if (!send_timer) {
 				/* send */
 				pck.hdr.flags = 0;
+				pck.hdr.extra = 0;
 				pck.hdr.type = 0;
-				pck.hdr.res1 = 0;
 				pck.u64 = hall_ticks;
 				nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
 				send_timer = SEND_DELAY * HALL_SLOW_HZ;

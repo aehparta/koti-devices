@@ -29,26 +29,32 @@ extern "C" {
 #define KOTI_NRF_ID_UUID                0x02
 
 /* nrf packet types (0-127) */
-#define KOTI_NRF_HELLO                  0
-#define KOTI_NRF_GET_ID                 1
-#define KOTI_NRF_SET_ID                 2
+#define KOTI_NRF_TYPE_HELLO                 0
+#define KOTI_NRF_TYPE_GET_ID                1
+#define KOTI_NRF_TYPE_SET_ID                2
 
 /* Temperature and humidity, 8 bytes:
  *  4 bytes: temperature, float
  *  4 bytes: humidity, float
  */
-#define KOTI_NRF_TH                     3
+#define KOTI_NRF_TYPE_TH                    3
 
 /* Pressure and windspeed, 8 bytes:
  *  4 bytes: pressure, float
  *  4 bytes: windspeed, float
  */
-#define KOTI_NRF_PRESSURE_WINDSPEED     4
+#define KOTI_NRF_TYPE_PRESSURE_WINDSPEED    4
 
 /* Water flow, 4 bytes:
  *  4 bytes: water flow, float
  */
-#define KOTI_NRF_WATER_FLOW             5
+#define KOTI_NRF_TYPE_WATER_FLOW            5
+
+/* Simple buttons:
+ * data[0]: number of buttons/switches
+ * data[1-7]: each bit represents state
+ */
+#define KOTI_NRF_TYPE_BUTTONS               6
 
 
 /* nrf packet flags */
@@ -102,11 +108,14 @@ struct koti_nrf_header {
 	 */
 	uint8_t flags;
 
+	/* extra, bits:
+	 *  0-2: battery level (1-7) or zero if not available
+	 *  ...
+	 */
+	uint8_t extra;
+
 	/* packet type */
 	uint8_t type;
-
-	/* reserved */
-	uint8_t res1;
 
 	/* unencrypted payload crc-8 */
 	uint8_t crc;
