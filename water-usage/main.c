@@ -19,17 +19,20 @@
 #pragma config BOREN = OFF
 
 
-#define HALL_PIN_EN     GPIOC0
-#define HALL_PIN_READ   GPIOB7
+#define HALL_PIN_EN     GPIOB7
+#define HALL_PIN_READ   GPIOC7
 
 #define HALL_SLOW_HZ    20
 #define HALL_FAST_HZ    1292
 
 #define HALL_DELAY      5
-#define SEND_DELAY      60
+#define SEND_DELAY      2
 
 #define SLOW_TIMER      193 /* 20 Hz */
 #define FAST_TIMER      3 /* 1292 Hz */
+
+/* nrf irq pin, not used but must be input */
+#define NRF_PIN_IRQ     GPIOC6
 
 
 struct spi_master master;
@@ -42,39 +45,26 @@ void p_init(void)
 	/* debug/log init */
 	// log_init();
 
-	/* initialize spi master, hardcoded pins etc so zeroes there */
-	spi_master_open(&master, NULL, 0, 0, 0, 0);
-
-	/* nrf initialization, hardcoded pins so zeroes there */
-	nrf24l01p_koti_init(&master, 0, 0);
-	nrf24l01p_koti_set_key((uint8_t *)"12345678", 8);
-
-	/* hall sensor */
-	gpio_output(HALL_PIN_EN);
-	gpio_high(HALL_PIN_EN);
-	gpio_input(HALL_PIN_READ);
-
-	/* all other gpios as output and high to save power */
+	/* all unused gpios as output and low to save power */
 	gpio_output(GPIOA0);
-	gpio_high(GPIOA0);
+	gpio_low(GPIOA0);
 	gpio_output(GPIOA1);
-	gpio_high(GPIOA1);
+	gpio_low(GPIOA1);
 	gpio_output(GPIOA2);
-	gpio_high(GPIOA2);
+	gpio_low(GPIOA2);
 	gpio_output(GPIOA4);
-	gpio_high(GPIOA4);
+	gpio_low(GPIOA4);
 	gpio_output(GPIOA5);
-	gpio_high(GPIOA5);
+	gpio_low(GPIOA5);
+
+	gpio_output(GPIOC0);
+	gpio_low(GPIOC0);
 	gpio_output(GPIOC3);
-	gpio_high(GPIOC3);
+	gpio_low(GPIOC3);
 	gpio_output(GPIOC4);
-	gpio_high(GPIOC4);
+	gpio_low(GPIOC4);
 	gpio_output(GPIOC5);
-	gpio_high(GPIOC5);
-	gpio_output(GPIOC6);
-	gpio_high(GPIOC6);
-	gpio_output(GPIOC7);
-	gpio_high(GPIOC7);
+	gpio_low(GPIOC5);
 
 	/* disable all modules and enable only needed parts to save power */
 	PMD0 = 0xff;
@@ -88,27 +78,38 @@ void p_init(void)
 	PMD7 = 0xff;
 #endif
 
-	/* system clock to peripherals enabled */
+	/* enable some of the needed modules */
 	SYSCMD = 0;
-
-	/* FVR enabled */
-	// FVRMD = 0;
-
-	/* timer 0 enabled */
+	MSSP1MD = 0;
 	TMR0MD = 0;
 
-	/* spi enabled */
-	MSSP1MD = 0;
+	/* hall sensor */
+	gpio_input(HALL_PIN_READ);
+	gpio_output(HALL_PIN_EN);
+	gpio_high(HALL_PIN_EN);
 
-	/* full sleep mode */
-	IDLEN = 0;
+	/* initialize spi master, hardcoded pins etc so zeroes there */
+	spi_master_open(&master, NULL, 0, 0, 0, 0);
 
-	/* Timer0 wakes up the cpu once and a while */
+	/* nrf initialization, hardcoded pins so zeroes there */
+	nrf24l01p_koti_init(&master, 0, 0);
+	nrf24l01p_koti_set_key((uint8_t *)"12345678", 8);
+
+	/* disable system clock, we don't need it until later */
+	SYSCMD = 1;
+
+	/* nrf irq as input, not used though */
+	gpio_input(NRF_PIN_IRQ);
+
+	/* timer 0 setup */
 	TMR0L = 0;
 	TMR0H = SLOW_TIMER; /* with 1:8 prescaler this makes 20Hz (50 ms intervals) */
 	T0CON1 = 0x93; /* LFINTOSC and async, 1:8 prescaler */
 	T0CON0 = 0x80; /* enable timer as 8-bit, no postscaler */
 	TMR0IE = 1;
+
+	/* full sleep mode */
+	IDLEN = 0;
 }
 
 void main(void)
@@ -122,6 +123,75 @@ void main(void)
 	uint16_t send_timer = HALL_DELAY * HALL_SLOW_HZ;
 	struct koti_nrf_pck_broadcast_uuid pck;
 	memcpy(pck.uuid, "123456789abcdef", 16);
+
+
+
+	// ADCMD = 0;
+	// FVRMD = 0;
+	// while (!FVRRDY);
+	// FVRCON = 0x81;
+	// ADCLK = 0;
+	// ADCON2 = 0x00;
+	// ADREF = 0x00;
+	// ADPCH = 0x3e;
+	// ADCON0bits.ON = 1;
+	// while (1) {
+	// 	ADCON0bits.GO = 1;
+	// 	while (ADCON0bits.GO);
+	// 	pck.hdr.bat = (uint8_t)((2048.0 * 16.0 / (float)ADRES) * 2048.0 / 100.0);
+	// 	pck.hdr.flags = 0;
+	// 	pck.hdr.type = 0;
+	// 	nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
+	// 	os_delay_ms(300);
+	// }
+
+
+
+
+	// while (1) {
+	// 	memset(pck.data, 0, 8);
+
+	// 	SYSCMD = 0;
+
+	// 	/* enable adc/fvr */
+	// 	FVRMD = 0;
+	// 	ADCMD = 0;
+	// 	while (!FVRRDY);
+	// 	FVRCON = 0x81;
+	// 	ADPCH = 0x3e;
+	// 	ADCON0 = 0x80;
+
+	// 	/* do one conversion before actual conversion, for some reason things are not stable yet */
+	// 	ADCON0bits.GO = 1;
+	// 	while (ADCON0bits.GO);
+
+	// 	/* calculate battery voltage with 100mV precision */
+	// 	ADCON0bits.GO = 1;
+	// 	while (ADCON0bits.GO);
+	// 	pck.hdr.bat = (uint8_t)((2048.0 * 16.0 / (float)ADRES) * 2048.0 / 100.0);
+	// 	pck.u16[0] = ADRES >> 4;
+
+	// 	/* disable adc/fvr */
+	// 	ADCMD = 1;
+	// 	FVRMD = 1;
+
+	// 	/* send */
+	// 	pck.hdr.flags = 0;
+	// 	pck.hdr.type = 0;
+	// 	nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
+
+
+	// 	SYSCMD = 1;
+
+	// 	os_delay_ms(300);
+	// }
+
+
+
+
+
+
+
 
 	while (1) {
 		SLEEP();
@@ -155,13 +225,41 @@ void main(void)
 			}
 		} else {
 			if (!send_timer) {
+				/* enable system clock */
+				SYSCMD = 0;
+
+				/* enable adc/fvr */
+				FVRMD = 0;
+				ADCMD = 0;
+				while (!FVRRDY);
+				FVRCON = 0x81;
+				ADPCH = 0x3e;
+				ADCON0 = 0x80;
+
+				/* do one conversion before actual conversion, for some reason things are not stable yet */
+				ADCON0bits.GO = 1;
+				while (ADCON0bits.GO);
+
+				/* calculate battery voltage with 100mV precision */
+				ADCON0bits.GO = 1;
+				while (ADCON0bits.GO);
+				pck.hdr.bat = (uint8_t)((2048.0 * 16.0 / (float)ADRES) * 2048.0 / 100.0);
+				/* do rough estimation of battery being empty: under 1.9 volts is quite empty */
+				pck.hdr.bat |= pck.hdr.bat < 19 ? KOTI_NRF_BAT_EMPTY_MASK : 0;
+
+				/* disable adc/fvr */
+				ADCMD = 1;
+				FVRMD = 1;
+
 				/* send */
 				pck.hdr.flags = 0;
-				pck.hdr.extra = 0;
 				pck.hdr.type = 0;
 				pck.u64 = hall_ticks;
 				nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
 				send_timer = SEND_DELAY * HALL_SLOW_HZ;
+
+				/* disable system clock */
+				SYSCMD = 1;
 			}
 			send_timer--;
 		}

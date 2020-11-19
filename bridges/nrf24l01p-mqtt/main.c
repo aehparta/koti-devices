@@ -98,7 +98,9 @@ int main(int argc, char *argv[])
 			os_delay_ms(1000);
 			break;
 		} else if (ok > 0) {
-			DEBUG_MSG("got packet (u64: %lu, dif: %lu, litres: %f)", pck.u64[0], pck.u64[0] - last, (float)(pck.u64[0] - last) / 1200.0);
+			DEBUG_MSG("got packet (battery: %0.1fV, %s) (u64: %lu, dif: %lu, litres: %f)",
+				(float)(pck.hdr.bat & KOTI_NRF_BAT_VOLTAGE_MASK) / 10.0, pck.hdr.bat & KOTI_NRF_BAT_EMPTY_MASK ? "EMPTY" : "OK",
+				pck.u64[0], pck.u64[0] - last, (float)(pck.u64[0] - last) / 1200.0);
 			last = pck.u64[0];
 			HEX_DUMP(&pck, sizeof(pck), 1);
 			ASCII_DUMP(&pck, sizeof(pck), 0);

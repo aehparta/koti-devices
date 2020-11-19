@@ -63,6 +63,10 @@ extern "C" {
 /* ack flag */
 #define KOTI_NRF_ACK_BIT                0x04
 
+/* battery related */
+#define KOTI_NRF_BAT_VOLTAGE_MASK       0x3f
+#define KOTI_NRF_BAT_EMPTY_MASK         0x80
+
 /* encryption */
 /* RC5 is for small target encryptions.
  * Security-wise it is quite well tested and pretty much enough for most IOT stuff.
@@ -100,7 +104,7 @@ struct koti_nrf_header {
 		uint32_t id;
 	};
 
-	/* flags, bits:
+	/* flag bits:
 	 *  0-1: ttl, 2 bits (must be zero when using header as iv)
 	 *  2: acknowledge
 	 *  4-5: 8-byte blocks of payload encrypted (0: first block only, 1: first 2 blocks, 2 or 3: all of it)
@@ -108,11 +112,12 @@ struct koti_nrf_header {
 	 */
 	uint8_t flags;
 
-	/* extra, bits:
-	 *  0-2: battery level (1-7) or zero if not available
-	 *  ...
+	/* battery bits:
+	 *  0-5: battery voltage with 100mV precision (63=6.3V, 33=3.3V, ..) or zero if not available
+	 *  6: ?
+	 *  7: battery charge state, 0 = empty or nearly empty, 1 = ok
 	 */
-	uint8_t extra;
+	uint8_t bat;
 
 	/* packet type */
 	uint8_t type;
@@ -169,6 +174,8 @@ struct koti_nrf_pck_broadcast_uuid {
 		uint8_t data[8];
 		/* two floats */
 		float f32[2];
+		/* four 16 bit unsigned ints */
+		uint16_t u16[4];
 		/* two 32 bit unsigned ints */
 		uint32_t u32[2];
 		/* 64-bit unsigned int */
