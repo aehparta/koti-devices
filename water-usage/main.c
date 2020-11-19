@@ -76,30 +76,39 @@ void p_init(void)
 	gpio_output(GPIOC7);
 	gpio_high(GPIOC7);
 
-#if defined(MCU_PIC16LF18345) || defined(MCU_PIC16LF18446)
-	/* full sleep mode */
-	IDLEN = 0;
-
-	/* disable almost all modules to save power */
-	PMD0 = 0x7f; /* system clock enabled */
-	PMD1 = 0xfe; /* timer 0 enabled */
+	/* disable all modules and enable only needed parts to save power */
+	PMD0 = 0xff;
+	PMD1 = 0xff;
 	PMD2 = 0xff;
 	PMD3 = 0xff;
-	PMD4 = 0xfd; /* spi enabled */
+	PMD4 = 0xff;
 	PMD5 = 0xff;
+#if defined(MCU_PIC16LF18446)
+	PMD6 = 0xff;
+	PMD7 = 0xff;
+#endif
+
+	/* system clock to peripherals enabled */
+	SYSCMD = 0;
+
+	/* FVR enabled */
+	// FVRMD = 0;
+
+	/* timer 0 enabled */
+	TMR0MD = 0;
+
+	/* spi enabled */
+	MSSP1MD = 0;
+
+	/* full sleep mode */
+	IDLEN = 0;
 
 	/* Timer0 wakes up the cpu once and a while */
 	TMR0L = 0;
 	TMR0H = SLOW_TIMER; /* with 1:8 prescaler this makes 20Hz (50 ms intervals) */
 	T0CON1 = 0x93; /* LFINTOSC and async, 1:8 prescaler */
 	T0CON0 = 0x80; /* enable timer as 8-bit, no postscaler */
-	PIE0bits.TMR0IE = 1;
-#endif
-
-	/* enable interrupts globally */
-	// INTCONbits.GIE = 1;
-	// INTCONbits.PEIE = 1;
-
+	TMR0IE = 1;
 }
 
 void main(void)
@@ -116,9 +125,7 @@ void main(void)
 
 	while (1) {
 		SLEEP();
-#if defined(MCU_PIC16LF18345) || defined(MCU_PIC16LF18446)
-		PIR0bits.TMR0IF = 0;
-#endif
+		TMR0IF = 0;
 
 		/* read hall */
 		uint8_t hall_now = gpio_read(HALL_PIN_READ);
@@ -132,21 +139,17 @@ void main(void)
 			hall_last = hall_now;
 			hall_ticks++;
 
-#if defined(MCU_PIC16LF18345) || defined(MCU_PIC16LF18446)
 			if (!hall_changed) {
 				TMR0H = FAST_TIMER;
 			}
-#endif
 
 			/* wait a while for things to cool down */
 			hall_changed = HALL_DELAY * HALL_FAST_HZ;
 		} else if (hall_changed) {
 			hall_changed--;
 			if (!hall_changed) {
-#if defined(MCU_PIC16LF18345) || defined(MCU_PIC16LF18446)
 				/* back to slow playing */
 				TMR0H = SLOW_TIMER;
-#endif
 				/* send shortly after no changes in hall */
 				send_timer = HALL_DELAY * HALL_SLOW_HZ;
 			}
@@ -163,20 +166,4 @@ void main(void)
 			send_timer--;
 		}
 	}
-
-	/* program loop */
-	// while (1) {
-	// 	struct koti_nrf_pck_broadcast_uuid pck;
-
-	// 	os_wdt_reset();
-
-	// 	memset(&pck, 0, sizeof(pck));
-	// 	memcpy(pck.uuid, "123456789abcdef", 16);
-	// 	pck.u64 = x;
-	// 	x++;
-
-	// 	nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
-
-	// 	os_delay_ms(1000);
-	// }
 }
