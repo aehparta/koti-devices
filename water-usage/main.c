@@ -26,7 +26,7 @@
 #define HALL_FAST_HZ    1292
 
 #define HALL_DELAY      5
-#define SEND_DELAY      10
+#define SEND_DELAY      60
 
 #define SLOW_TIMER      193 /* 20 Hz */
 #define FAST_TIMER      3 /* 1292 Hz */
@@ -279,15 +279,16 @@ void main(void)
 				buf[3] = 0x18;
 				buf[4] = vbat; 
 
+				uint64_t litres = hall_ticks / 1200;
 
 				buf[5] = 7;
 				buf[6] = 0x16;
 				buf[7] = 0x67;
 				buf[8] = 0x27;
-				buf[9] = hall_ticks & 0xff;
-				buf[10] = (hall_ticks >> 8) & 0xff;
-				buf[11] = (hall_ticks >> 16) & 0xff;
-				buf[12] = (hall_ticks >> 24) & 0xff;
+				buf[9] = litres & 0xff;
+				buf[10] = (litres >> 8) & 0xff;
+				buf[11] = (litres >> 16) & 0xff;
+				buf[12] = (litres >> 24) & 0xff;
 
 				nrf24l01p_set_power_down(&nrf_ble.nrf, false);
 				for (int i = 0; i < 3; i++) {
