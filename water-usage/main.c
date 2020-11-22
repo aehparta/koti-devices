@@ -26,7 +26,7 @@
 #define HALL_FAST_HZ    1292
 
 #define HALL_DELAY      5
-#define SEND_DELAY      2
+#define SEND_DELAY      10
 
 #define SLOW_TIMER      193 /* 20 Hz */
 #define FAST_TIMER      3 /* 1292 Hz */
@@ -36,6 +36,10 @@
 
 
 struct spi_master master;
+#ifdef USE_BLE
+struct nrf24l01p_ble_device nrf_ble;
+uint8_t mac[6] = { 0x17, 0x17, 'B', 'E', 'B', 'T' };
+#endif
 
 
 void p_init(void)
@@ -92,8 +96,14 @@ void p_init(void)
 	spi_master_open(&master, NULL, 0, 0, 0, 0);
 
 	/* nrf initialization, hardcoded pins so zeroes there */
+#ifndef USE_BLE
 	nrf24l01p_koti_init(&master, 0, 0);
 	nrf24l01p_koti_set_key((uint8_t *)"12345678", 8);
+#else
+	/* nrf ble initialization */
+	nrf24l01p_ble_open(&nrf_ble, &master, 0, 0, mac);
+	nrf24l01p_set_power_down(&nrf_ble.nrf, true);
+#endif
 
 	/* disable system clock, we don't need it until later */
 	SYSCMD = 1;
@@ -121,9 +131,14 @@ void main(void)
 	uint16_t hall_changed = 0;
 	uint64_t hall_ticks = 0;
 	uint16_t send_timer = HALL_DELAY * HALL_SLOW_HZ;
+
+#ifndef USE_BLE
 	struct koti_nrf_pck_broadcast_uuid pck;
 	memcpy(pck.uuid, "123456789abcdef", 16);
-
+#else
+	uint8_t buf[18];
+	uint8_t l = 0;
+#endif
 
 
 	// ADCMD = 0;
@@ -186,13 +201,6 @@ void main(void)
 	// 	os_delay_ms(300);
 	// }
 
-
-
-
-
-
-
-
 	while (1) {
 		SLEEP();
 		TMR0IF = 0;
@@ -243,19 +251,51 @@ void main(void)
 				/* calculate battery voltage with 100mV precision */
 				ADCON0bits.GO = 1;
 				while (ADCON0bits.GO);
-				pck.hdr.bat = (uint8_t)((2048.0 * 16.0 / (float)ADRES) * 2048.0 / 100.0);
-				/* do rough estimation of battery being empty: under 1.9 volts is quite empty */
-				pck.hdr.bat |= pck.hdr.bat < 19 ? KOTI_NRF_BAT_EMPTY_MASK : 0;
+				uint8_t vbat = (uint8_t)((2048.0 * 16.0 / (float)ADRES) * 2048.0 / 100.0);
 
 				/* disable adc/fvr */
 				ADCMD = 1;
 				FVRMD = 1;
 
 				/* send */
+#ifndef USE_BLE
 				pck.hdr.flags = 0;
 				pck.hdr.type = 0;
+				pck.hdr.bat = vbat | vbat < 20 ? KOTI_NRF_BAT_EMPTY_MASK : 0; /* do rough estimation of battery being empty: under 2.0 volts is quite empty */
 				pck.u64 = hall_ticks;
 				nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
+#else
+				/* calculate rough battery level using voltage as linear indicator (not exactly accurate..):
+				 *  - 3.0 volts or above is full
+				 *  - 2.0 volts or under is empty
+				 */
+				vbat = vbat < 20 ? 0 : vbat - 20;
+				vbat *= 10;
+				vbat = vbat > 100 ? 100 : vbat;
+
+				buf[0] = 4;
+				buf[1] = 0x16;
+				buf[2] = 0x0f;
+				buf[3] = 0x18;
+				buf[4] = vbat; 
+
+
+				buf[5] = 7;
+				buf[6] = 0x16;
+				buf[7] = 0x67;
+				buf[8] = 0x27;
+				buf[9] = hall_ticks & 0xff;
+				buf[10] = (hall_ticks >> 8) & 0xff;
+				buf[11] = (hall_ticks >> 16) & 0xff;
+				buf[12] = (hall_ticks >> 24) & 0xff;
+
+				nrf24l01p_set_power_down(&nrf_ble.nrf, false);
+				for (int i = 0; i < 3; i++) {
+					nrf24l01p_ble_advertise(&nrf_ble, buf, 13);
+					nrf24l01p_ble_hop(&nrf_ble);
+				}
+				nrf24l01p_set_power_down(&nrf_ble.nrf, true);
+#endif
 				send_timer = SEND_DELAY * HALL_SLOW_HZ;
 
 				/* disable system clock */
