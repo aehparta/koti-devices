@@ -5,18 +5,14 @@
 #include <koti.h>
 
 #if defined(MCU_PIC16LF18345)
-#pragma config FEXTOSC = OFF
 #pragma config DEBUG = OFF
-#pragma config LPBOREN = OFF
 #endif
 
-#if defined(MCU_PIC16LF18446)
 #pragma config FEXTOSC = OFF
-#pragma config LPBOREN = OFF
-#endif
-
 #pragma config WDTE = OFF
 #pragma config BOREN = OFF
+#pragma config LPBOREN = OFF
+#pragma config CSWEN = ON
 
 
 #define HALL_PIN_EN     GPIOB7
@@ -44,6 +40,13 @@ uint8_t mac[6] = { 0x17, 0x17, 'B', 'E', 'B', 'T' };
 
 void p_init(void)
 {
+	/* switch to 32MHz clock */
+	OSCCON1 = 0x60;
+	OSCCON3 = 0x00;
+	OSCEN = 0x00;
+	OSCFRQ = 0x06;
+	OSCTUNE = 0x00;
+
 	/* very low level platform initialization */
 	os_init();
 	/* debug/log init */
@@ -109,7 +112,7 @@ void p_init(void)
 	SYSCMD = 1;
 
 	/* nrf irq as input, not used though */
-	gpio_input(NRF_PIN_IRQ);
+	// gpio_input(NRF_PIN_IRQ);
 
 	/* timer 0 setup */
 	TMR0L = 0;
@@ -201,6 +204,11 @@ void main(void)
 	// 	os_delay_ms(300);
 	// }
 
+	// while (1) {
+	// 	SLEEP();
+	// 	TMR0IF = 0;
+	// }
+
 	while (1) {
 		SLEEP();
 		TMR0IF = 0;
@@ -210,6 +218,7 @@ void main(void)
 
 		/* trigger new measurement */
 		gpio_low(HALL_PIN_EN);
+		os_delay_us(1);
 		gpio_high(HALL_PIN_EN);
 
 		/* check for changes */
@@ -230,6 +239,7 @@ void main(void)
 				TMR0H = SLOW_TIMER;
 				/* send shortly after no changes in hall */
 				send_timer = HALL_DELAY * HALL_SLOW_HZ;
+				/* start dozing */
 			}
 		} else {
 			if (!send_timer) {
@@ -242,6 +252,7 @@ void main(void)
 				while (!FVRRDY);
 				FVRCON = 0x81;
 				ADPCH = 0x3e;
+				ADCLK = 2;
 				ADCON0 = 0x80;
 
 				/* do one conversion before actual conversion, for some reason things are not stable yet */
@@ -261,15 +272,15 @@ void main(void)
 #ifndef USE_BLE
 				pck.hdr.flags = 0;
 				pck.hdr.type = 0;
-				pck.hdr.bat = vbat | vbat < 20 ? KOTI_NRF_BAT_EMPTY_MASK : 0; /* do rough estimation of battery being empty: under 2.0 volts is quite empty */
+				pck.hdr.bat = vbat | vbat < 19 ? KOTI_NRF_BAT_EMPTY_MASK : 0; /* do rough estimation of battery being empty: under 1.9 volts is quite empty */
 				pck.u64 = hall_ticks;
 				nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
 #else
 				/* calculate rough battery level using voltage as linear indicator (not exactly accurate..):
-				 *  - 3.0 volts or above is full
-				 *  - 2.0 volts or under is empty
+				 *  - 2.8 volts or above is full
+				 *  - 1.9 volts or under is empty
 				 */
-				vbat = vbat < 20 ? 0 : vbat - 20;
+				vbat = vbat < 19 ? 0 : vbat - 18;
 				vbat *= 10;
 				vbat = vbat > 100 ? 100 : vbat;
 
@@ -277,7 +288,7 @@ void main(void)
 				buf[1] = 0x16;
 				buf[2] = 0x0f;
 				buf[3] = 0x18;
-				buf[4] = vbat; 
+				buf[4] = vbat;
 
 				uint64_t litres = hall_ticks / 1200;
 
@@ -290,12 +301,10 @@ void main(void)
 				buf[11] = (litres >> 16) & 0xff;
 				buf[12] = (litres >> 24) & 0xff;
 
-				nrf24l01p_set_power_down(&nrf_ble.nrf, false);
-				for (int i = 0; i < 3; i++) {
+				for (uint8_t i = 0; i < 3; i++) {
 					nrf24l01p_ble_advertise(&nrf_ble, buf, 13);
 					nrf24l01p_ble_hop(&nrf_ble);
 				}
-				nrf24l01p_set_power_down(&nrf_ble.nrf, true);
 #endif
 				send_timer = SEND_DELAY * HALL_SLOW_HZ;
 
