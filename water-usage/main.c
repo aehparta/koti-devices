@@ -16,19 +16,16 @@
 
 
 #define HALL_PIN_EN     GPIOB7
+#define HALL_PIN_EN_BIT LATBbits.LATB7
 #define HALL_PIN_READ   GPIOC7
 
-#define HALL_SLOW_HZ    20
-#define HALL_FAST_HZ    1292
 
-#define HALL_DELAY      5
-#define SEND_DELAY      60
+#define TIMER_HZ        20
+#define HALL_PULSES_CNT (65536 - 60) /* pulses per litre */
+#define HALL_WAIT       2 /* seconds */
 
-#define SLOW_TIMER      193 /* 20 Hz */
-#define FAST_TIMER      3 /* 1292 Hz */
+#define SEND_DELAY      30
 
-/* nrf irq pin, not used but must be input */
-#define NRF_PIN_IRQ     GPIOC6
 
 
 struct spi_master master;
@@ -89,6 +86,7 @@ void p_init(void)
 	SYSCMD = 0;
 	MSSP1MD = 0;
 	TMR0MD = 0;
+	TMR1MD = 0;
 
 	/* hall sensor */
 	gpio_input(HALL_PIN_READ);
@@ -108,18 +106,22 @@ void p_init(void)
 	nrf24l01p_set_power_down(&nrf_ble.nrf, true);
 #endif
 
-	/* disable system clock, we don't need it until later */
-	SYSCMD = 1;
-
-	/* nrf irq as input, not used though */
-	// gpio_input(NRF_PIN_IRQ);
-
 	/* timer 0 setup */
 	TMR0L = 0;
-	TMR0H = SLOW_TIMER; /* with 1:8 prescaler this makes 20Hz (50 ms intervals) */
-	T0CON1 = 0x93; /* LFINTOSC and async, 1:8 prescaler */
-	T0CON0 = 0x80; /* enable timer as 8-bit, no postscaler */
+	TMR0H = 31000 / TIMER_HZ / 16;
+	T0CON1 = 0x94; /* LFINTOSC and async, 1:16 prescaler */
 	TMR0IE = 1;
+	T0CON0 = 0x80; /* enable timer as 8-bit, no postscaler */
+
+	/* timer 1 setup */
+	TMR1H = HALL_PULSES_CNT >> 8;
+	TMR1L = HALL_PULSES_CNT & 0xff;
+	T1GCON = 0x00;
+	TMR1GATE = 0;
+	TMR1CLK = 0;
+	T1CKIPPS = HALL_PIN_READ;
+	TMR1IE = 1;
+	T1CON = 0x07;
 
 	/* full sleep mode */
 	IDLEN = 0;
@@ -130,121 +132,50 @@ void main(void)
 	/* init */
 	p_init();
 
-	uint8_t hall_last = gpio_read(HALL_PIN_READ);
-	uint16_t hall_changed = 0;
-	uint64_t hall_ticks = 0;
-	uint16_t send_timer = HALL_DELAY * HALL_SLOW_HZ;
-
 #ifndef USE_BLE
 	struct koti_nrf_pck_broadcast_uuid pck;
+	memset(pck.data, 0, sizeof(pck.data));
 	memcpy(pck.uuid, "123456789abcdef", 16);
 #else
 	uint8_t buf[18];
-	uint8_t l = 0;
 #endif
 
-
-	// ADCMD = 0;
-	// FVRMD = 0;
-	// while (!FVRRDY);
-	// FVRCON = 0x81;
-	// ADCLK = 0;
-	// ADCON2 = 0x00;
-	// ADREF = 0x00;
-	// ADPCH = 0x3e;
-	// ADCON0bits.ON = 1;
-	// while (1) {
-	// 	ADCON0bits.GO = 1;
-	// 	while (ADCON0bits.GO);
-	// 	pck.hdr.bat = (uint8_t)((2048.0 * 16.0 / (float)ADRES) * 2048.0 / 100.0);
-	// 	pck.hdr.flags = 0;
-	// 	pck.hdr.type = 0;
-	// 	nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
-	// 	os_delay_ms(300);
-	// }
-
-
-
-
-	// while (1) {
-	// 	memset(pck.data, 0, 8);
-
-	// 	SYSCMD = 0;
-
-	// 	/* enable adc/fvr */
-	// 	FVRMD = 0;
-	// 	ADCMD = 0;
-	// 	while (!FVRRDY);
-	// 	FVRCON = 0x81;
-	// 	ADPCH = 0x3e;
-	// 	ADCON0 = 0x80;
-
-	// 	/* do one conversion before actual conversion, for some reason things are not stable yet */
-	// 	ADCON0bits.GO = 1;
-	// 	while (ADCON0bits.GO);
-
-	// 	/* calculate battery voltage with 100mV precision */
-	// 	ADCON0bits.GO = 1;
-	// 	while (ADCON0bits.GO);
-	// 	pck.hdr.bat = (uint8_t)((2048.0 * 16.0 / (float)ADRES) * 2048.0 / 100.0);
-	// 	pck.u16[0] = ADRES >> 4;
-
-	// 	/* disable adc/fvr */
-	// 	ADCMD = 1;
-	// 	FVRMD = 1;
-
-	// 	/* send */
-	// 	pck.hdr.flags = 0;
-	// 	pck.hdr.type = 0;
-	// 	nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
-
-
-	// 	SYSCMD = 1;
-
-	// 	os_delay_ms(300);
-	// }
-
-	// while (1) {
-	// 	SLEEP();
-	// 	TMR0IF = 0;
-	// }
+	uint32_t litres = 0;
+	uint16_t send_timer = SEND_DELAY * TIMER_HZ;
+	uint8_t hall_delay = 0;
+	uint8_t hall_last = HALL_PULSES_CNT & 0xff;
+	int vbat = 0;
 
 	while (1) {
+		SYSCMD = 1;
 		SLEEP();
-		TMR0IF = 0;
+		HALL_PIN_EN_BIT = 0;
+		SYSCMD = 0;
 
-		/* read hall */
-		uint8_t hall_now = gpio_read(HALL_PIN_READ);
+		if (hall_last != TMR1L) {
+			hall_last = TMR1L;
+			hall_delay = HALL_WAIT * TIMER_HZ;
+		} else if (hall_delay == 0) {
+			HALL_PIN_EN_BIT = 1;
+		}
 
-		/* trigger new measurement */
-		gpio_low(HALL_PIN_EN);
-		os_delay_us(1);
-		gpio_high(HALL_PIN_EN);
+		if (TMR1IF) {
+			TMR1IF = 0;
+			TMR1H = HALL_PULSES_CNT >> 8;
+			TMR1L = HALL_PULSES_CNT & 0xff;
+			litres++;
+		}
 
-		/* check for changes */
-		if (hall_now != hall_last) {
-			hall_last = hall_now;
-			hall_ticks++;
+		if (TMR0IF) {
+			TMR0IF = 0;
 
-			if (!hall_changed) {
-				TMR0H = FAST_TIMER;
+			if (hall_delay) {
+				hall_delay--;
 			}
 
-			/* wait a while for things to cool down */
-			hall_changed = HALL_DELAY * HALL_FAST_HZ;
-		} else if (hall_changed) {
-			hall_changed--;
-			if (!hall_changed) {
-				/* back to slow playing */
-				TMR0H = SLOW_TIMER;
-				/* send shortly after no changes in hall */
-				send_timer = HALL_DELAY * HALL_SLOW_HZ;
-				/* start dozing */
-			}
-		} else {
-			if (!send_timer) {
-				/* enable system clock */
-				SYSCMD = 0;
+			send_timer--;
+			if (send_timer == 0) {
+				send_timer = SEND_DELAY * TIMER_HZ;
 
 				/* enable adc/fvr */
 				FVRMD = 0;
@@ -262,35 +193,39 @@ void main(void)
 				/* calculate battery voltage with 100mV precision */
 				ADCON0bits.GO = 1;
 				while (ADCON0bits.GO);
-				uint8_t vbat = (uint8_t)((2048.0 * 16.0 / (float)ADRES) * 2048.0 / 100.0);
+
+				/* (2048 * 2048 * 16) / ADRES = millivolts:
+				 *  - ADRES = 22370 = 3.0V or ADRESH = 87
+				 *  - ADRES = 23140 = 2.9V
+				 *  - ADRES = 23967 = 2.8V
+				 *  - ADRES = 33554 = 2.0V
+				 *  - ADRES = 35320 = 1.9V or ADRESH = 137
+				 */
+				if (ADRESH > 137) {
+					vbat = 0;
+				} else {
+					vbat = -(ADRESH);
+					vbat += 137;
+					vbat = vbat < 50 ? vbat * 2 : 100;
+				}
 
 				/* disable adc/fvr */
 				ADCMD = 1;
 				FVRMD = 1;
 
-				/* send */
+				/* send data */
 #ifndef USE_BLE
 				pck.hdr.flags = 0;
 				pck.hdr.type = 0;
-				pck.hdr.bat = vbat | vbat < 19 ? KOTI_NRF_BAT_EMPTY_MASK : 0; /* do rough estimation of battery being empty: under 1.9 volts is quite empty */
-				pck.u64 = hall_ticks;
+				pck.hdr.bat = (uint8_t)vbat;
+				pck.u32[0] = litres;
 				nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
 #else
-				/* calculate rough battery level using voltage as linear indicator (not exactly accurate..):
-				 *  - 2.8 volts or above is full
-				 *  - 1.9 volts or under is empty
-				 */
-				vbat = vbat < 19 ? 0 : vbat - 18;
-				vbat *= 10;
-				vbat = vbat > 100 ? 100 : vbat;
-
 				buf[0] = 4;
 				buf[1] = 0x16;
 				buf[2] = 0x0f;
 				buf[3] = 0x18;
-				buf[4] = vbat;
-
-				uint64_t litres = hall_ticks / 1200;
+				buf[4] = (uint8_t)vbat;
 
 				buf[5] = 7;
 				buf[6] = 0x16;
@@ -306,12 +241,7 @@ void main(void)
 					nrf24l01p_ble_hop(&nrf_ble);
 				}
 #endif
-				send_timer = SEND_DELAY * HALL_SLOW_HZ;
-
-				/* disable system clock */
-				SYSCMD = 1;
 			}
-			send_timer--;
 		}
 	}
 }

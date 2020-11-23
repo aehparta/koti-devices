@@ -194,17 +194,12 @@ int8_t nrf24l01p_koti_send(uint8_t to, uint8_t from, void *p)
 #ifdef USE_KOTI_NRF_LOW_POWER
 	/* switch power on */
 	nrf24l01p_set_power_down(&nrf, false);
-	/* write tx buffer */
-	nrf24l01p_tx_wr(&nrf, pck);
 	/* enable radio */
 	nrf24l01p_set_standby(&nrf, false);
-	/* wait data to be transmitted */
-	while (!(nrf24l01p_read_status(&nrf) & 0x20));
+	/* write tx buffer */
+	nrf24l01p_tx_wr(&nrf, pck);
 	/* disable radio */
 	nrf24l01p_set_standby(&nrf, true);
-	/* clear sent bit (why we need to flush?) */
-	// nrf24l01p_write_reg(&nrf, NRF24L01P_REG_STATUS, 0x20);
-	nrf24l01p_flush_tx(&nrf);
 	/* power down */
 	nrf24l01p_set_power_down(&nrf, true);
 #else
