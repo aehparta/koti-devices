@@ -78,12 +78,10 @@ int main(int argc, char *argv[])
 	/* init */
 	if (p_init(argc, argv)) {
 		ERROR_MSG("initialization failed");
-		os_delay_ms(500); /* some hardware (pic8) might not print the last line feed without this */
 		p_exit(EXIT_FAILURE);
 	}
 
 	/* program loop */
-	INFO_MSG("starting main program loop");
 	while (1) {
 		static uint64_t last = 0;
 		int ok;

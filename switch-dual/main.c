@@ -95,7 +95,7 @@ void main(void)
 	p_init();
 
 	struct koti_nrf_pck_broadcast_uuid pck;
-	memcpy(pck.uuid, "123456789abcdef", 16);
+	memcpy(pck.uuid, "koti-switch-test", 16);
 
 	while (1) {
 		SLEEP();
@@ -107,8 +107,8 @@ void main(void)
 
 		/* send */
 		pck.hdr.flags = 0;
-		pck.hdr.extra = 0;
-		pck.hdr.type = 0;
+		pck.hdr.bat = 0;
+		pck.hdr.type = KOTI_NRF_TYPE_BUTTONS;
 		memset(pck.data, 0, sizeof(pck.data));
 		pck.data[0] = 2;
 		pck.data[1] = (btn1 ? 0 : 1) | (btn2 ? 0 : 2);
