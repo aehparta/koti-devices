@@ -3,6 +3,7 @@
  */
 
 #include <koti.h>
+#include "device-uuid.h"
 
 #pragma config FEXTOSC = OFF
 #pragma config WDTE = OFF
@@ -15,7 +16,8 @@
 #define BTN2            GPIOC5
 
 
-struct spi_master master;
+static struct spi_master master;
+static const uint8_t uuid[] = UUID_ARRAY;
 
 
 void p_init(void)
@@ -95,7 +97,7 @@ void main(void)
 	p_init();
 
 	struct koti_nrf_pck_broadcast_uuid pck;
-	memcpy(pck.uuid, "koti-switch-test", 16);
+	memcpy(pck.uuid, uuid, 16);
 
 	while (1) {
 		SLEEP();
