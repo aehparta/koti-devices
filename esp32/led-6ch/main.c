@@ -19,7 +19,7 @@
 #define ERASE_CONFIG_BUTTON_GPIO    13
 
 /* MQTT topic prefix */
-#define MQTT_PREFIX                 CONFIG_MQTT_PREFIX DEVICE_UUID
+#define MQTT_PREFIX                 CONFIG_MQTT_PREFIX UUID_STRING
 
 /* whether or not to retain state messages */
 #define MQTT_RETAIN                 1

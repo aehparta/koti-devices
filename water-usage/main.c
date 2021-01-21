@@ -24,7 +24,7 @@
 #define HALL_PULSES_CNT (65536 - 60) /* pulses per litre */
 #define HALL_WAIT       2 /* seconds */
 
-#define SEND_DELAY      30
+#define SEND_DELAY      10
 
 
 
@@ -231,10 +231,10 @@ void main(void)
 				buf[6] = 0x16;
 				buf[7] = 0x67;
 				buf[8] = 0x27;
-				buf[9] = litres & 0xff;
-				buf[10] = (litres >> 8) & 0xff;
-				buf[11] = (litres >> 16) & 0xff;
-				buf[12] = (litres >> 24) & 0xff;
+				buf[9] = (litres >> 24) & 0xff;
+				buf[10] = (litres >> 16) & 0xff;
+				buf[11] = (litres >> 8) & 0xff;
+				buf[12] = litres & 0xff;
 
 				for (uint8_t i = 0; i < 3; i++) {
 					nrf24l01p_ble_advertise(&nrf_ble, buf, 13);
