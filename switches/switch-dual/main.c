@@ -11,14 +11,11 @@
 #pragma config BOREN = OFF
 #pragma config LPBOREN = OFF
 
-
-#define BTN1            GPIOC4
-#define BTN2            GPIOC5
-
+#define BTN1 GPIOC4
+#define BTN2 GPIOC5
 
 static struct spi_master master;
 static const uint8_t uuid[] = UUID_ARRAY;
-
 
 void p_init(void)
 {
@@ -88,7 +85,6 @@ void p_init(void)
 	/* enable interrupts globally */
 	// INTCONbits.GIE = 1;
 	// INTCONbits.PEIE = 1;
-
 }
 
 void main(void)
@@ -116,20 +112,4 @@ void main(void)
 		pck.data[1] = (btn1 ? 0 : 1) | (btn2 ? 0 : 2);
 		nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
 	}
-
-	/* program loop */
-	// while (1) {
-	// 	struct koti_nrf_pck_broadcast_uuid pck;
-
-	// 	os_wdt_reset();
-
-	// 	memset(&pck, 0, sizeof(pck));
-	// 	memcpy(pck.uuid, "123456789abcdef", 16);
-	// 	pck.u64 = x;
-	// 	x++;
-
-	// 	nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
-
-	// 	os_delay_ms(1000);
-	// }
 }

@@ -12,3 +12,7 @@ ifeq ($(TARGET),X86)
 	CFLAGS += -I$(KOTI_PATH)/mosquitto/lib -I$(KOTI_PATH)/jsmn
 	CXXFLAGS += -I$(KOTI_PATH)/mosquitto/lib -I$(KOTI_PATH)/jsmn
 endif
+ifneq ($(filter $(libe_DEFINES),USE_HTTPD),)
+	koti_SRC += $(KOTI_PATH)/common/httpd/httpd.c
+	LDFLAGS += -lmicrohttpd -lb64 -lcrypto -lpcre
+endif

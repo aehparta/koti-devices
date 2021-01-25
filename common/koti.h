@@ -18,6 +18,10 @@ extern "C" {
 #endif
 #include "nrf24l01p/nrf.h"
 
+#ifdef USE_HTTPD
+#include "httpd/httpd.h"
+#endif
+
 #ifdef __cplusplus
 }
 #endif
