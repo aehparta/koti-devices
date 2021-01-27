@@ -14,7 +14,7 @@ include $(KOTI_PATH)/init.mk
 # our own sources etc
 BUILD_BINS = switch-generic
 PROGRAM_BIN = switch-generic
-switch-generic_SRC = main.c $(libe_SRC) $(koti_SRC)
+switch-generic_SRC = main.c web.c switch.c $(libe_SRC) $(koti_SRC)
 
 # build
 include $(KOTI_PATH)/build.mk

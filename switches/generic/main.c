@@ -3,27 +3,9 @@
  */
 
 #include <koti.h>
+#include "web.h"
 
 // struct spi_master master;
-
-int twwwcb(struct MHD_Connection *connection, const char *url, const char *method, const char *upload_data, size_t *upload_data_size, const char **substrings, size_t substrings_c, void *userdata)
-{
-	char data[1024];
-
-	sprintf(data, "got request, method: %s, url: %s\n", method, url);
-	for (int i = 0; i < substrings_c; i++) {
-		sprintf(data + strlen(data), "substring: %s\n", substrings[i]);
-	}
-
-	printf("%s", data);
-
-	struct MHD_Response *response = MHD_create_response_from_buffer(strlen(data), data, MHD_RESPMEM_MUST_COPY);
-	MHD_add_response_header(response, "Content-Type", "text/html; charset=utf-8");
-	int err = MHD_queue_response(connection, 200, response);
-	MHD_destroy_response(response);
-
-	return err;
-}
 
 int p_init(int argc, char *argv[])
 {
@@ -32,11 +14,8 @@ int p_init(int argc, char *argv[])
 	/* debug/log init */
 	log_init();
 
-#ifdef TARGET_X86
-    httpd_init();
-    httpd_start("0.0.0.0", 8001, "./html");
-	CRIT_IF_R(httpd_register_url(NULL, "/switch/([0-9]+)/?$", twwwcb, NULL), 1, "failed to register");
-#endif
+	/* init development web interface (or do nothing if target does not use it) */
+	CRIT_IF_R(web_init(), -1, "failed to initialize web interface");
 
 	/* initialize spi master */
 	// #ifdef USE_DRIVER_NRF24L01P /* this is to disable real nrf driver for development purposes */
@@ -66,6 +45,7 @@ void p_exit(int retval)
 {
 	// nrf24l01p_koti_quit();
 	// spi_master_close(&master);
+	web_quit();
 	log_quit();
 	os_quit();
 	exit(retval);
