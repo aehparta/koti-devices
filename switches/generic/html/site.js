@@ -1,9 +1,16 @@
 const baseurl = "";
 
 $(document).ready(() => {
-  $("h1").on("click", () => {
-    $.get(baseurl + "switch/1/toggle").done(data => {
-      console.log(data);
+  $("body").on("click", ".switch", function () {
+    const sw = $(this).attr("switch");
+    $.get(baseurl + "switch/" + sw + "/toggle").done((data) => {
+      $(this).removeClass("on");
+      $(this).removeClass("off");
+      if (data === "on") {
+        $(this).addClass("on");
+      } else if (data === "off") {
+        $(this).addClass("off");
+      }
     });
   });
 });

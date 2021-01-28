@@ -1,0 +1,16 @@
+ul {
+  list-style-type: none;
+}
+
+.switch {
+  width: 100px;
+  height: 50px;
+}
+
+.switch.on {
+  background: #70c070;
+}
+
+.switch.off {
+  background: #c07070;
+}
