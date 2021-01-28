@@ -13,36 +13,34 @@
 #include <freertos/event_groups.h>
 #include "device-uuid.h"
 
-
 /* only button on the PCB is connected to GPIO13 */
-#define WIFI_CONFIG_BUTTON_GPIO     13
-#define ERASE_CONFIG_BUTTON_GPIO    13
+#define WIFI_CONFIG_BUTTON_GPIO 13
+#define ERASE_CONFIG_BUTTON_GPIO 13
 
 /* MQTT topic prefix */
-#define MQTT_PREFIX                 CONFIG_MQTT_PREFIX UUID_STRING
+#define MQTT_PREFIX CONFIG_MQTT_PREFIX UUID_STRING
 
 /* whether or not to retain state messages */
-#define MQTT_RETAIN                 1
+#define MQTT_RETAIN 1
 
 /* QOS */
-#define MQTT_QOS                    1
+#define MQTT_QOS 1
 
 /* mDNS query response wait */
 #ifndef DEBUG
-#define MDNS_RESPONSE_WAIT_DELAY    5000
+#define MDNS_RESPONSE_WAIT_DELAY 5000
 #else
-#define MDNS_RESPONSE_WAIT_DELAY    1000
+#define MDNS_RESPONSE_WAIT_DELAY 1000
 #endif
 
 /* use 20kHz which above audible, some cheap PSUs tend to vibrate at the same frequency as PWM */
-#define PWM_FREQUENCY               20000
-#define PWM_RESOLUTION              10
+#define PWM_FREQUENCY 20000
+#define PWM_RESOLUTION 10
 
 /* adjust brightness down if temperature exceeds this level */
-#define TEMPERATURE_LIMIT           55
+#define TEMPERATURE_LIMIT 55
 /* max temperature value that we can even detect */
-#define TEMPERATURE_MAX             60
-
+#define TEMPERATURE_MAX 60
 
 esp_mqtt_client_handle_t mqtt_client;
 
@@ -54,12 +52,11 @@ struct channel {
 	uint8_t value;
 };
 /* this setting is for chinese LED strips using GRB order */
-struct channel ch[6] = { {4, 0, 0}, {2, 0, 0}, {18, 0, 0}, {19, 0, 0}, {23, 0, 0}, {22, 0, 0} };
+struct channel ch[6] = {{4, 0, 0}, {2, 0, 0}, {18, 0, 0}, {19, 0, 0}, {23, 0, 0}, {22, 0, 0}};
 
 static EventGroupHandle_t event_group;
 static const int MQTT_CONNECTED_BIT = BIT0;
 static const int MQTT_CONNECTING_BIT = BIT1;
-
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
@@ -76,7 +73,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 		// esp_mqtt_client_publish(client, MQTT_PREFIX "/led3/state", "0", 0, 1, 1);
 		// esp_mqtt_client_publish(client, MQTT_PREFIX "/led4/state", "0", 0, 1, 1);
 		// esp_mqtt_client_publish(client, MQTT_PREFIX "/led5/state", "0", 0, 1, 1);
-
 
 		/* first RGB channel */
 		sprintf(s_temp, "%u,%u,%u", ch[0].value, ch[1].value, ch[2].value);
@@ -231,7 +227,7 @@ char *mdns_find(char *service, char *proto, uint16_t *port)
 	mdns_result_t *results = NULL;
 
 	mdns_init();
-	esp_err_t err = mdns_query_ptr(service, proto, MDNS_RESPONSE_WAIT_DELAY, 10,  &results);
+	esp_err_t err = mdns_query_ptr(service, proto, MDNS_RESPONSE_WAIT_DELAY, 10, &results);
 	mdns_free();
 	if (err) {
 		ERROR_MSG("mDNS query failed");
@@ -274,8 +270,7 @@ void mqtt_connect(void)
 		esp_mqtt_client_config_t mqtt_cfg = {
 			.uri = CONFIG_MQTT_BROKER_URL,
 			.username = CONFIG_MQTT_USERNAME,
-			.password = CONFIG_MQTT_PASSWORD
-		};
+			.password = CONFIG_MQTT_PASSWORD};
 		mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
 		esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, mqtt_client);
 		esp_mqtt_client_start(mqtt_client);
@@ -303,8 +298,7 @@ void mqtt_connect(void)
 			.host = host,
 			.port = port,
 			.username = CONFIG_MQTT_USERNAME,
-			.password = CONFIG_MQTT_PASSWORD
-		};
+			.password = CONFIG_MQTT_PASSWORD};
 		mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
 		esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, mqtt_client);
 		esp_mqtt_client_start(mqtt_client);
@@ -355,14 +349,16 @@ int app_main(int argc, char *argv[])
 		os_wdt_reset();
 
 		/* check for smartconfig button */
-		button_pressed(WIFI_CONFIG_BUTTON_GPIO, 1000) {
+		button_pressed(WIFI_CONFIG_BUTTON_GPIO, 1000)
+		{
 			/* set repeat to zero (disable) */
 			button_repeat(WIFI_CONFIG_BUTTON_GPIO, 0);
 			INFO_MSG("wifi smartconfig button pressed");
 			wifi_smartconfig(true);
 		}
 		/* check if pressed long enough, then do erase of nvm and reset */
-		button_pressed(ERASE_CONFIG_BUTTON_GPIO, 5000) {
+		button_pressed(ERASE_CONFIG_BUTTON_GPIO, 5000)
+		{
 			INFO_MSG("erasing nvm and resetting device");
 			nvm_erase();
 			os_restart();

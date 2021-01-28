@@ -7,6 +7,7 @@ USE +=
 
 # x86 specific
 USE_X86 += LOG LOG_COLORS HTTPD
+LDFLAGS_X86 += -luuid
 
 # init
 include $(KOTI_PATH)/init.mk
