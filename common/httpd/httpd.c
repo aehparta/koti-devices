@@ -8,7 +8,7 @@
 #include "httpd.h"
 
 #define SESSION_COOKIE_NAME "SESSIONID"
-
+#define POST_BUFFER_SIZE 1024       /* 256 is minimum */
 #define URL_MAX_REGEX_SUBSTRINGS 30 /* should be multiple of 3 */
 
 enum {
@@ -22,10 +22,9 @@ struct httpd_url_regex {
 	pcre *mrex;
 	pcre *urex;
 
-	int (*callback)(struct MHD_Connection *connection,
-	                const char *url, const char *method,
-	                const char *upload_data, size_t upload_data_size,
-	                const char **substrings, size_t substrings_c,
+	int (*callback)(struct MHD_Connection *connection, const char *method,
+	                const char *data, size_t size,
+	                const char **restr, size_t restr_c,
 	                void *userdata);
 	void *userdata;
 
@@ -48,8 +47,11 @@ struct httpd_session {
 
 struct httpd_request {
 	struct httpd_session *session;
+	struct httpd_url_regex *u;
+
 	struct MHD_PostProcessor *pp;
-	struct httpd_url_regex *url;
+	char *data;
+	size_t size;
 
 	char *restr[URL_MAX_REGEX_SUBSTRINGS];
 	int restr_c;
@@ -68,18 +70,18 @@ static int httpd_404(struct MHD_Connection *connection, struct httpd_request *re
 static int httpd_get_default(struct MHD_Connection *connection, struct httpd_request *request, const char *url);
 static struct httpd_request *httpd_request_find(struct MHD_Connection *connection, void **con_cls);
 static int httpd_request_handler(void *cls, struct MHD_Connection *connection,
-                                 const char *url,
-                                 const char *method, const char *version,
-                                 const char *upload_data,
-                                 size_t *upload_data_size,
-                                 void **con_cls);
+                                 const char *url, const char *method, const char *version,
+                                 const char *data, size_t *size, void **con_cls);
+static int httpd_request_recv_data(void *con_cls, enum MHD_ValueKind kind, const char *key,
+                                   const char *filename, const char *content_type,
+                                   const char *transfer_encoding,
+                                   const char *data, uint64_t off, size_t size);
 static void httpd_request_completed(void *cls, struct MHD_Connection *connection,
                                     void **con_cls, enum MHD_RequestTerminationCode toe);
 static int httpd_register_url_with_type(int type, char *method_pattern, char *url_pattern,
-                                        int (*callback)(struct MHD_Connection *connection,
-                                                        const char *url, const char *method,
-                                                        const char *upload_data, size_t upload_data_size,
-                                                        const char **substrings, size_t substrings_c,
+                                        int (*callback)(struct MHD_Connection *connection, const char *method,
+                                                        const char *data, size_t size,
+                                                        const char **restr, size_t restr_c,
                                                         void *userdata),
                                         void *userdata);
 /* session related internal functions */
@@ -126,10 +128,9 @@ int httpd_start(char *address, uint16_t port, char *root)
 }
 
 int httpd_register_url(char *method_pattern, char *url_pattern,
-                       int (*callback)(struct MHD_Connection *connection,
-                                       const char *url, const char *method,
-                                       const char *upload_data, size_t upload_data_size,
-                                       const char **substrings, size_t substrings_c,
+                       int (*callback)(struct MHD_Connection *connection, const char *method,
+                                       const char *data, size_t size,
+                                       const char **restr, size_t restr_c,
                                        void *userdata),
                        void *userdata)
 {
@@ -229,10 +230,8 @@ static struct httpd_request *httpd_request_find(struct MHD_Connection *connectio
 }
 
 static int httpd_request_handler(void *cls, struct MHD_Connection *connection,
-                                 const char *url,
-                                 const char *method, const char *version,
-                                 const char *upload_data,
-                                 size_t *upload_data_size, void **con_cls)
+                                 const char *url, const char *method, const char *version,
+                                 const char *data, size_t *size, void **con_cls)
 {
 	int ret = -1;
 	struct httpd_request *request;
@@ -246,8 +245,26 @@ static int httpd_request_handler(void *cls, struct MHD_Connection *connection,
 
 	/* if this is a continued POST/PUT */
 	if (request->pp) {
-		printf("continued post/put %p %p %lu\n", request, upload_data, *upload_data_size);
-		return MHD_YES;
+		MHD_post_process(request->pp, data, *size);
+		if (*size) {
+			request->data = realloc(request->data, request->size + *size + 1);
+			memcpy(request->data + request->size, data, *size);
+			request->size += *size;
+			request->data[request->size] = '\0';
+			*size = 0;
+			return MHD_YES;
+		}
+		/* done, serve response */
+		MHD_destroy_post_processor(request->pp);
+		request->pp = NULL;
+		ret = request->u->callback(connection, method, request->data, request->size,
+		                           (const char **)request->restr, request->restr_c,
+		                           request->u->userdata);
+		if (request->data) {
+			free(request->data);
+			request->data = NULL;
+		}
+		return ret;
 	}
 
 	/* loop through list of urls to catch */
@@ -275,11 +292,11 @@ static int httpd_request_handler(void *cls, struct MHD_Connection *connection,
 		/* match */
 		if (u->type == HTTPD_URL_REGEX_TYPE_NORMAL) {
 			if (strcmp(method, "POST") == 0 || strcmp(method, "PUT") == 0) {
-				ret = MHD_YES;
-				request->pp = (void *)1;
+				request->pp = MHD_create_post_processor(connection, POST_BUFFER_SIZE, httpd_request_recv_data, request);
+				request->u = u;
+				ret = request->pp ? MHD_YES : MHD_NO;
 			} else {
-				ret = u->callback(connection, url, method,
-				                  NULL, 0,
+				ret = u->callback(connection, method, NULL, 0,
 				                  (const char **)request->restr, request->restr_c,
 				                  u->userdata);
 			}
@@ -311,6 +328,18 @@ static int httpd_request_handler(void *cls, struct MHD_Connection *connection,
 	return httpd_get_default(connection, request, url);
 }
 
+static int httpd_request_recv_data(void *con_cls, enum MHD_ValueKind kind, const char *key,
+                                   const char *filename, const char *content_type,
+                                   const char *transfer_encoding,
+                                   const char *data, uint64_t off, size_t size)
+{
+	// struct httpd_request *request = con_cls;
+
+	printf("data, key: %s, file: %s, type: %s, encoding: %s, len: %lu, offset: %lu\n", key, filename, content_type, transfer_encoding, size, off);
+
+	return MHD_YES;
+}
+
 static void httpd_request_completed(void *cls,
                                     struct MHD_Connection *connection,
                                     void **con_cls,
@@ -323,15 +352,20 @@ static void httpd_request_completed(void *cls,
 		for (int i = 0; i < request->restr_c; i++) {
 			free(request->restr[i]);
 		}
+		if (request->pp) {
+			MHD_destroy_post_processor(request->pp);
+		}
+		if (request->data) {
+			free(request->data);
+		}
 		free(request);
 	}
 }
 
 static int httpd_register_url_with_type(int type, char *method_pattern, char *url_pattern,
-                                        int (*callback)(struct MHD_Connection *connection,
-                                                        const char *url, const char *method,
-                                                        const char *upload_data, size_t upload_data_size,
-                                                        const char **substrings, size_t substrings_c,
+                                        int (*callback)(struct MHD_Connection *connection, const char *method,
+                                                        const char *data, size_t size,
+                                                        const char **restr, size_t restr_c,
                                                         void *userdata),
                                         void *userdata)
 {

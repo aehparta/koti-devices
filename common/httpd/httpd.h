@@ -14,10 +14,9 @@ void httpd_quit(void);
 int httpd_start(char *address, uint16_t port, char *root);
 
 int httpd_register_url(char *method_pattern, char *url_pattern,
-                       int (*callback)(struct MHD_Connection *connection,
-                                       const char *url, const char *method,
-                                       const char *upload_data, size_t upload_data_size,
-                                       const char **substrings, size_t substrings_c,
+                       int (*callback)(struct MHD_Connection *connection, const char *method,
+                                       const char *data, size_t size,
+                                       const char **restr, size_t restr_c,
                                        void *userdata),
                        void *userdata);
 
