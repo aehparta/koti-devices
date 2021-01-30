@@ -16,11 +16,36 @@ int8_t switch_init(void)
 	return 0;
 }
 
-int8_t switch_toggle(uint8_t sw)
+bool switch_state(uint8_t sw)
 {
 	if (sw >= SWITCH_COUNT) {
-		return -1;
+		return false;
 	}
-	switches[sw] = !switches[sw];
 	return switches[sw];
+}
+
+bool switch_on(uint8_t sw)
+{
+	if (sw >= SWITCH_COUNT) {
+		return false;
+	}
+	switches[sw] = true;
+	return true;
+}
+
+bool switch_off(uint8_t sw)
+{
+	if (sw >= SWITCH_COUNT) {
+		return false;
+	}
+	switches[sw] = false;
+	return false;
+}
+
+bool switch_toggle(uint8_t sw)
+{
+	if (sw >= SWITCH_COUNT) {
+		return false;
+	}
+	return switches[sw] ? switch_off(sw) : switch_on(sw);
 }
