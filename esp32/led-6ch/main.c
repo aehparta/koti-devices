@@ -1,5 +1,5 @@
 /*
- * WiFi example.
+ * 6-channel LED board.
  */
 
 #include <libe/libe.h>
@@ -35,7 +35,7 @@
 
 /* use 20kHz which above audible, some cheap PSUs tend to vibrate at the same frequency as PWM */
 #define PWM_FREQUENCY 20000
-#define PWM_RESOLUTION 10
+#define PWM_RESOLUTION 8
 
 /* adjust brightness down if temperature exceeds this level */
 #define TEMPERATURE_LIMIT 55
@@ -52,7 +52,11 @@ struct channel {
 	uint8_t value;
 };
 /* this setting is for chinese LED strips using GRB order */
+#ifdef USE_DEFAULT_ON
+struct channel ch[6] = {{4, 1, 255}, {2, 1, 255}, {18, 1, 255}, {19, 1, 255}, {23, 1, 255}, {22, 1, 255}};
+#else
 struct channel ch[6] = {{4, 0, 0}, {2, 0, 0}, {18, 0, 0}, {19, 0, 0}, {23, 0, 0}, {22, 0, 0}};
+#endif
 
 static EventGroupHandle_t event_group;
 static const int MQTT_CONNECTED_BIT = BIT0;
@@ -329,6 +333,7 @@ int app_main(int argc, char *argv[])
 	pwm_open(&pwm, NULL, PWM_FREQUENCY, PWM_RESOLUTION);
 	for (int i = 0; i < 6; i++) {
 		pwm_channel_enable(&pwm, i, ch[i].pin);
+		pwm_set_duty(&pwm, i, ch[i].state ? ch[i].value : 0);
 	}
 
 	/* adc for temperature measurement, MCP9700A is connected to ADC1 channel 5 */
@@ -412,6 +417,7 @@ int app_main(int argc, char *argv[])
 					}
 					/* decrease only by one if we are under maximum */
 					ch[i].value -= (t_now < TEMPERATURE_MAX ? 1 : 5);
+					pwm_set_duty(&pwm, i, ch[i].state ? ch[i].value : 0);
 					char *topic = NULL;
 					asprintf(&topic, MQTT_PREFIX "/led%u/state", i);
 					sprintf(s_temp, "%u", ch[i].value);

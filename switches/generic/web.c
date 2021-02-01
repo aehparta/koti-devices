@@ -4,48 +4,41 @@
 
 #include <stdbool.h>
 #include <koti.h>
-#include "switch.h"
+#include "button.h"
 #include "web.h"
 
-/* switch-requests */
-int web_req_switch(struct MHD_Connection *connection, const char *method,
-                   const char *data, size_t size,
-                   const char **restr, size_t restr_c,
-                   void *userdata);
-
-int web_init(void)
+static int web_req_button_count(struct MHD_Connection *connection, const char *method,
+                                const char *data, size_t size,
+                                const char **restr, size_t restr_c,
+                                void *userdata)
 {
-	httpd_init();
-	httpd_start(WEB_HTTPD_ADDR, WEB_HTTPD_PORT, WEB_HTTPD_PATH);
-	CRIT_IF_R(httpd_register_url(NULL, "/switch/([0-9]+)/?$", web_req_switch, NULL), -1, "failed to register");
-	return 0;
+	char value[4];
+	sprintf(value, "%u", button_count());
+	struct MHD_Response *response = MHD_create_response_from_buffer(strlen(value), value, MHD_RESPMEM_MUST_COPY);
+	MHD_add_response_header(response, "Content-Type", "text/html; charset=utf-8");
+	int err = MHD_queue_response(connection, 200, response);
+	MHD_destroy_response(response);
+	return err;
 }
 
-void web_quit(void)
-{
-	httpd_quit();
-}
-
-/* internals */
-
-int web_req_switch(struct MHD_Connection *connection, const char *method,
-                   const char *data, size_t size,
-                   const char **restr, size_t restr_c,
-                   void *userdata)
+static int web_req_button(struct MHD_Connection *connection, const char *method,
+                          const char *data, size_t size,
+                          const char **restr, size_t restr_c,
+                          void *userdata)
 {
 	bool state = false;
 	uint8_t sw = atoi(restr[1]);
 
 	if (strcmp(method, "POST") == 0 || strcmp(method, "PUT") == 0) {
 		if (strcmp(data, "toggle") == 0) {
-			state = switch_toggle(sw);
+			state = button_toggle(sw);
 		} else if (strcmp(data, "on") == 0) {
-			state = switch_on(sw);
+			state = button_on(sw);
 		} else if (strcmp(data, "off") == 0) {
-			state = switch_off(sw);
+			state = button_off(sw);
 		}
 	} else {
-		state = switch_state(sw);
+		state = button_state(sw);
 	}
 
 	struct MHD_Response *response = MHD_create_response_from_buffer(state ? 2 : 3, state ? "on" : "off", MHD_RESPMEM_MUST_COPY);
@@ -54,4 +47,18 @@ int web_req_switch(struct MHD_Connection *connection, const char *method,
 	MHD_destroy_response(response);
 
 	return err;
+}
+
+int web_init(void)
+{
+	httpd_init();
+	httpd_start(WEB_HTTPD_ADDR, WEB_HTTPD_PORT, WEB_HTTPD_PATH);
+	CRIT_IF_R(httpd_register_url(NULL, "/button/([0-9]+)/?$", web_req_button, NULL), -1, "failed to register");
+	CRIT_IF_R(httpd_register_url("GET", "/button/count/?$", web_req_button_count, NULL), -1, "failed to register");
+	return 0;
+}
+
+void web_quit(void)
+{
+	httpd_quit();
 }

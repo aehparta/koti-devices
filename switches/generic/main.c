@@ -17,33 +17,39 @@ int p_init(int argc, char *argv[])
 	/* init development web interface (or do nothing if target does not use it) */
 	CRIT_IF_R(web_init(), -1, "failed to initialize web interface");
 
-	/* initialize spi master */
-	// #ifdef USE_DRIVER_NRF24L01P /* this is to disable real nrf driver for development purposes */
-	// #ifdef USE_FTDI
-	// 	/* open ft232h type device and try to see if it has a nrf24l01+ connected to it through mpsse-spi */
-	// 	ERROR_IF_R(os_ftdi_use(OS_FTDI_GPIO_0_TO_63, 0, 0, NULL, NULL), -1, "unable to open ftdi device for gpio 0-63");
-	// 	os_ftdi_set_mpsse(SPI_SCLK);
-	// #endif
-	// 	ERROR_IF_R(spi_master_open(
-	// 	               &master,     /* must give pre-allocated spi master as pointer */
-	// 	               SPI_CONTEXT, /* context depends on platform */
-	// 	               SPI_FREQUENCY,
-	// 	               SPI_MISO,
-	// 	               SPI_MOSI,
-	// 	               SPI_SCLK),
-	// 	           -1, "failed to open spi master");
-	// #endif
+/* initialize spi master */
+// #ifdef USE_DRIVER_NRF24L01P /* this is to disable real nrf driver for development purposes */
+// #ifdef USE_FTDI
+// 	/* open ft232h type device and try to see if it has a nrf24l01+ connected to it through mpsse-spi */
+// 	ERROR_IF_R(os_ftdi_use(OS_FTDI_GPIO_0_TO_63, 0, 0, NULL, NULL), -1, "unable to open ftdi device for gpio 0-63");
+// 	os_ftdi_set_mpsse(SPI_SCLK);
+// #endif
+// 	ERROR_IF_R(spi_master_open(
+// 	               &master,     /* must give pre-allocated spi master as pointer */
+// 	               SPI_CONTEXT, /* context depends on platform */
+// 	               SPI_FREQUENCY,
+// 	               SPI_MISO,
+// 	               SPI_MOSI,
+// 	               SPI_SCLK),
+// 	           -1, "failed to open spi master");
+// #endif
 
-	// 	/* nrf initialization */
-	// 	ERROR_IF_R(nrf24l01p_koti_init(&master, NRF_SS, NRF_CE), -1, "nrf24l01+ failed to initialize");
-	// 	nrf24l01p_koti_set_key((uint8_t *)"12345678", 8);
+// 	/* nrf initialization */
+#if defined(USE_SPI) && defined(USE_DRIVER_NRF24L01P)
+	ERROR_IF_R(nrf24l01p_koti_init(&master, NRF_SS, NRF_CE), -1, "nrf24l01+ failed to initialize");
+#elif defined(USE_BROADCAST)
+	ERROR_IF_R(nrf24l01p_koti_init(NULL, 0, 0), -1, "nrf24l01+ failed to initialize");
+#else
+	#error "no communication driver available"
+#endif
+	nrf24l01p_koti_set_key((uint8_t *)"12345678", 8);
 
 	return 0;
 }
 
 void p_exit(int retval)
 {
-	// nrf24l01p_koti_quit();
+	nrf24l01p_koti_quit();
 	// spi_master_close(&master);
 	web_quit();
 	log_quit();
