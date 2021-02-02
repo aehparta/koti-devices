@@ -11,7 +11,7 @@ const switch_update = (id, state) => {
 $(document).ready(() => {
   $("body").on("click", ".switch", function () {
     const id = $(this).attr("switch");
-    $.ajax(baseurl + "switch/" + id, {
+    $.ajax(baseurl + "button/" + id, {
       type: "PUT",
       data: "toggle",
     }).done((data) => {
@@ -20,7 +20,7 @@ $(document).ready(() => {
   });
 
   for (let id = 0; id < switch_count; id++) {
-    $.get(baseurl + "switch/" + id, (data) => {
+    $.get(baseurl + "button/" + id, (data) => {
       switch_update(id, data === "on");
     });
   }

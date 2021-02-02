@@ -16,8 +16,8 @@ extern "C" {
 #define KOTI_NRF_SPEED                  NRF24L01P_SPEED_250k
 
 /* basic nrf packet parts */
-#define KOTI_NRF_SIZE_HEADER            8
-#define KOTI_NRF_SIZE_PAYLOAD           24
+#define KOTI_NRF_SIZE_HEADER            10
+#define KOTI_NRF_SIZE_PAYLOAD           22
 #define KOTI_NRF_SIZE                   (KOTI_NRF_SIZE_HEADER + KOTI_NRF_SIZE_PAYLOAD)
 
 
@@ -119,10 +119,15 @@ struct koti_nrf_header {
 	 */
 	uint8_t bat;
 
-	/* packet type */
-	uint8_t type;
+	uint8_t extra0;
+	uint8_t extra1;
 
-	/* unencrypted payload crc-8 */
+	/* 
+	 * packet type and unencrypted payload crc-8
+	 * these are inside encrypted part of the packet
+	 * (last 24 bytes, 22 left for data)
+	 */
+	uint8_t type;
 	uint8_t crc;
 };
 
@@ -146,14 +151,14 @@ struct koti_nrf_pck {
 	};
 	/* payload */
 	union {
-		/* as bytes */
+		/* 22 bytes of data */
 		uint8_t data[KOTI_NRF_SIZE_PAYLOAD];
-		/* six floats */
-		float f32[6];
-		/* 32-bit unsigned ints */
-		uint32_t u32[6];
-		/* 64-bit unsigned ints */
-		uint64_t u64[3];
+		/* five floats */
+		float f32[5];
+		/* five 32-bit unsigned ints */
+		uint32_t u32[5];
+		/* two 64-bit unsigned ints */
+		uint64_t u64[2];
 		/* time */
 		struct koti_nrf_time time;
 	};
@@ -171,15 +176,13 @@ struct koti_nrf_pck_broadcast_uuid {
 	/* payload */
 	union {
 		/* as bytes */
-		uint8_t data[8];
-		/* two floats */
-		float f32[2];
-		/* four 16 bit unsigned ints */
-		uint16_t u16[4];
-		/* two 32 bit unsigned ints */
-		uint32_t u32[2];
-		/* 64-bit unsigned int */
-		uint64_t u64;
+		uint8_t data[6];
+		/* float */
+		float f32;
+		/* three 16 bit unsigned ints */
+		uint16_t u16[3];
+		/* unsigned int */
+		uint32_t u32;
 	};
 	/* uuid */
 	uint8_t uuid[16];

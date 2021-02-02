@@ -10,7 +10,7 @@ mosquitto:
 
 # generate device uuid
 uuid:
-	UUID=$(shell uuid); \
+	@UUID=$(shell uuid); \
 	echo "New UUID: $$UUID"; \
 	echo "$$UUID" > "device-uuid.txt"; \
 	echo "#define UUID_STRING \"$$UUID\"" > "device-uuid.h"; \

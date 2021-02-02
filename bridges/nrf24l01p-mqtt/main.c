@@ -5,22 +5,19 @@
 #include <koti.h>
 #include "mqtt.h"
 
-
 /* command line options */
 struct opt_option opt_all[] = {
-	{ 'h', "help", no_argument, 0, NULL, NULL, "display this help and exit", { 0 } },
+    {'h', "help", no_argument, 0, NULL, NULL, "display this help and exit", {0}},
 
-	/* mqtt server */
-	{ 'H', "mqtt-host", required_argument, 0, "localhost", NULL, "mqtt server hostname", { 0 } },
-	{ 'P', "mqtt-port", required_argument, 0, "1883", NULL, "mqtt server port", { OPT_FILTER_INT, 1, 65535 } },
-	{ 'X', "mqtt-prefix", required_argument, 0, NULL, NULL, "mqtt topic prefix", { 0 } },
+    /* mqtt server */
+    {'H', "mqtt-host", required_argument, 0, "localhost", NULL, "mqtt server hostname", {0}},
+    {'P', "mqtt-port", required_argument, 0, "1883", NULL, "mqtt server port", {OPT_FILTER_INT, 1, 65535}},
+    {'X', "mqtt-prefix", required_argument, 0, NULL, NULL, "mqtt topic prefix", {0}},
 
-	{ 0, 0, 0, 0, 0, 0, 0, { 0 } }
-};
+    {0, 0, 0, 0, 0, 0, 0, {0}}};
 
 /* global for spi master */
 struct spi_master master;
-
 
 int p_init(int argc, char *argv[])
 {
@@ -30,20 +27,20 @@ int p_init(int argc, char *argv[])
 	log_init();
 
 	/* initialize spi master */
-#ifdef USE_DRIVER_NRF24L01P /* this is to disable real nrf driver for development purposes */
+#ifdef USE_SPI /* this is to disable real nrf driver for development purposes */
 #ifdef USE_FTDI
 	/* open ft232h type device and try to see if it has a nrf24l01+ connected to it through mpsse-spi */
 	ERROR_IF_R(os_ftdi_use(OS_FTDI_GPIO_0_TO_63, 0x40403, 0x6014, NULL, NULL), -1, "unable to open ftdi device for gpio 0-63");
 	os_ftdi_set_mpsse(SPI_SCLK);
 #endif
 	ERROR_IF_R(spi_master_open(
-	               &master, /* must give pre-allocated spi master as pointer */
+	               &master,     /* must give pre-allocated spi master as pointer */
 	               SPI_CONTEXT, /* context depends on platform */
 	               SPI_FREQUENCY,
 	               SPI_MISO,
 	               SPI_MOSI,
-	               SPI_SCLK
-	           ), -1, "failed to open spi master");
+	               SPI_SCLK),
+	           -1, "failed to open spi master");
 #endif
 
 	/* nrf initialization */
@@ -60,7 +57,9 @@ int p_init(int argc, char *argv[])
 void p_exit(int retval)
 {
 	nrf24l01p_koti_quit();
+#ifdef USE_SPI
 	spi_master_close(&master);
+#endif
 	log_quit();
 	os_quit();
 	exit(retval);
@@ -97,8 +96,8 @@ int main(int argc, char *argv[])
 			break;
 		} else if (ok > 0) {
 			DEBUG_MSG("got packet (battery: %d%%) (u32: %u, u64: %lu)",
-				pck.hdr.bat,
-				pck.u32[0], pck.u64[0]);
+			          pck.hdr.bat,
+			          pck.u32[0], pck.u64[0]);
 			last = pck.u64[0];
 			HEX_DUMP(&pck, sizeof(pck), 1);
 			ASCII_DUMP(&pck, sizeof(pck), 0);
