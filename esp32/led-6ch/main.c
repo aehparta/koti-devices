@@ -51,11 +51,18 @@ struct channel {
 	bool state;
 	uint8_t value;
 };
-/* this setting is for chinese LED strips using GRB order */
+
+/* chinese LED strips using GRB order */
 #ifdef USE_DEFAULT_ON
 struct channel ch[6] = {{4, 1, 255}, {2, 1, 255}, {18, 1, 255}, {19, 1, 255}, {23, 1, 255}, {22, 1, 255}};
 #else
 struct channel ch[6] = {{4, 0, 0}, {2, 0, 0}, {18, 0, 0}, {19, 0, 0}, {23, 0, 0}, {22, 0, 0}};
+#endif
+
+/* motions sensor support: enable using RXD0 as on/off switch input with timer */
+#ifdef USE_MOTION_SENSOR
+#define MOTION_SENSOR_GPIO 3
+#define MOTION_SENSOR_ON_TIME 30.0 /* seconds */
 #endif
 
 static EventGroupHandle_t event_group;
@@ -71,12 +78,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 	switch (event->event_id) {
 	case MQTT_EVENT_CONNECTED:
 		INFO_MSG("MQTT connected");
-		// esp_mqtt_client_publish(client, MQTT_PREFIX "/led0/state", "0", 0, 1, 1);
-		// esp_mqtt_client_publish(client, MQTT_PREFIX "/led1/state", "0", 0, 1, 1);
-		// esp_mqtt_client_publish(client, MQTT_PREFIX "/led2/state", "0", 0, 1, 1);
-		// esp_mqtt_client_publish(client, MQTT_PREFIX "/led3/state", "0", 0, 1, 1);
-		// esp_mqtt_client_publish(client, MQTT_PREFIX "/led4/state", "0", 0, 1, 1);
-		// esp_mqtt_client_publish(client, MQTT_PREFIX "/led5/state", "0", 0, 1, 1);
 
 		/* first RGB channel */
 		sprintf(s_temp, "%u,%u,%u", ch[0].value, ch[1].value, ch[2].value);
@@ -272,9 +273,9 @@ void mqtt_connect(void)
 		/* static mqtt server defined */
 		INFO_MSG("wifi connected, using hardcoded MQTT server: %s", CONFIG_MQTT_BROKER_URL);
 		esp_mqtt_client_config_t mqtt_cfg = {
-			.uri = CONFIG_MQTT_BROKER_URL,
-			.username = CONFIG_MQTT_USERNAME,
-			.password = CONFIG_MQTT_PASSWORD};
+		    .uri = CONFIG_MQTT_BROKER_URL,
+		    .username = CONFIG_MQTT_USERNAME,
+		    .password = CONFIG_MQTT_PASSWORD};
 		mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
 		esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, mqtt_client);
 		esp_mqtt_client_start(mqtt_client);
@@ -299,10 +300,10 @@ void mqtt_connect(void)
 		/* connect to mqtt */
 		INFO_MSG("found mqtt server using mDNS: %s:%u", host, port);
 		esp_mqtt_client_config_t mqtt_cfg = {
-			.host = host,
-			.port = port,
-			.username = CONFIG_MQTT_USERNAME,
-			.password = CONFIG_MQTT_PASSWORD};
+		    .host = host,
+		    .port = port,
+		    .username = CONFIG_MQTT_USERNAME,
+		    .password = CONFIG_MQTT_PASSWORD};
 		mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
 		esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, mqtt_client);
 		esp_mqtt_client_start(mqtt_client);
@@ -320,6 +321,12 @@ int app_main(int argc, char *argv[])
 	log_init();
 	/* nvm needed by wifi */
 	nvm_init(NULL, 0);
+
+	/* motion sensor */
+#ifdef USE_MOTION_SENSOR
+	gpio_reset_pin(MOTION_SENSOR_GPIO);
+	gpio_input(MOTION_SENSOR_GPIO);
+#endif
 
 	/* wifi connect with nvm saved values */
 	wifi_init();
@@ -352,6 +359,20 @@ int app_main(int argc, char *argv[])
 	os_time_t adc_read_t = os_timef();
 	while (1) {
 		os_wdt_reset();
+
+#ifdef USE_MOTION_SENSOR
+		static os_time_t motion_sensor_t = 0;
+		static int motion_sensor_last = 0;
+		int motion_sensor_now = gpio_read(MOTION_SENSOR_GPIO);
+		if (motion_sensor_now != motion_sensor_last) {
+			motion_sensor_t = os_timef() + MOTION_SENSOR_ON_TIME;
+			motion_sensor_last = motion_sensor_now;
+            /* on */
+		}
+		if (motion_sensor_t < os_timef()) {
+            /* off */
+        }
+#endif
 
 		/* check for smartconfig button */
 		button_pressed(WIFI_CONFIG_BUTTON_GPIO, 1000)
