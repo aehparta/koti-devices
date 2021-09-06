@@ -61,7 +61,7 @@ struct channel ch[6] = {{4, 0, 0}, {2, 0, 0}, {18, 0, 0}, {19, 0, 0}, {23, 0, 0}
 
 /* motions sensor support: enable using RXD0 as on/off switch input with timer */
 #ifdef USE_MOTION_SENSOR
-#define MOTION_SENSOR_GPIO 3
+#define MOTION_SENSOR_GPIO 0
 #define MOTION_SENSOR_ON_TIME 30.0 /* seconds */
 #endif
 
@@ -69,29 +69,38 @@ static EventGroupHandle_t event_group;
 static const int MQTT_CONNECTED_BIT = BIT0;
 static const int MQTT_CONNECTING_BIT = BIT1;
 
+static void mqtt_publish(char *topic, char *message)
+{
+	if (xEventGroupGetBits(event_group) & MQTT_CONNECTED_BIT) {
+		esp_mqtt_client_publish(mqtt_client, topic, message, 0, MQTT_QOS, MQTT_RETAIN);
+	}
+}
+
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
 	esp_mqtt_event_handle_t event = event_data;
-	esp_mqtt_client_handle_t client = event->client;
 	char s_temp[128];
 
 	switch (event->event_id) {
 	case MQTT_EVENT_CONNECTED:
+		/* now connected */
 		INFO_MSG("MQTT connected");
+		xEventGroupSetBits(event_group, MQTT_CONNECTED_BIT);
+		xEventGroupClearBits(event_group, MQTT_CONNECTING_BIT);
 
 		/* first RGB channel */
 		sprintf(s_temp, "%u,%u,%u", ch[0].value, ch[1].value, ch[2].value);
-		esp_mqtt_client_publish(client, MQTT_PREFIX "/rgb0/state", s_temp, 0, MQTT_QOS, MQTT_RETAIN);
-		esp_mqtt_client_publish(client, MQTT_PREFIX "/rgb0/switch/state", ch[0].state ? "ON" : "OFF", 0, MQTT_QOS, MQTT_RETAIN);
-		esp_mqtt_client_subscribe(client, MQTT_PREFIX "/rgb0", 0);
-		esp_mqtt_client_subscribe(client, MQTT_PREFIX "/rgb0/switch", 0);
+		mqtt_publish(MQTT_PREFIX "/rgb0/state", s_temp);
+		mqtt_publish(MQTT_PREFIX "/rgb0/switch/state", ch[0].state ? "ON" : "OFF");
+		esp_mqtt_client_subscribe(mqtt_client, MQTT_PREFIX "/rgb0", 0);
+		esp_mqtt_client_subscribe(mqtt_client, MQTT_PREFIX "/rgb0/switch", 0);
 
 		/* second RGB channel */
 		sprintf(s_temp, "%u,%u,%u", ch[3].value, ch[4].value, ch[5].value);
-		esp_mqtt_client_publish(client, MQTT_PREFIX "/rgb1/state", s_temp, 0, MQTT_QOS, MQTT_RETAIN);
-		esp_mqtt_client_publish(client, MQTT_PREFIX "/rgb1/switch/state", ch[3].state ? "ON" : "OFF", 0, MQTT_QOS, MQTT_RETAIN);
-		esp_mqtt_client_subscribe(client, MQTT_PREFIX "/rgb1", 0);
-		esp_mqtt_client_subscribe(client, MQTT_PREFIX "/rgb1/switch", 0);
+		mqtt_publish(MQTT_PREFIX "/rgb1/state", s_temp);
+		mqtt_publish(MQTT_PREFIX "/rgb1/switch/state", ch[3].state ? "ON" : "OFF");
+		esp_mqtt_client_subscribe(mqtt_client, MQTT_PREFIX "/rgb1", 0);
+		esp_mqtt_client_subscribe(mqtt_client, MQTT_PREFIX "/rgb1/switch", 0);
 
 		/* separate channels */
 		for (int i = 0; i < 6; i++) {
@@ -99,25 +108,22 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 			asprintf(&topic, MQTT_PREFIX "/led%u/state", i);
 			sprintf(s_temp, "%u", ch[i].value);
-			esp_mqtt_client_publish(client, topic, s_temp, 0, MQTT_QOS, MQTT_RETAIN);
+			mqtt_publish(topic, s_temp);
 			free(topic);
 
 			asprintf(&topic, MQTT_PREFIX "/led%u/switch/state", i);
-			esp_mqtt_client_publish(client, topic, ch[i].state ? "ON" : "OFF", 0, MQTT_QOS, MQTT_RETAIN);
+			mqtt_publish(topic, ch[i].state ? "ON" : "OFF");
 			free(topic);
 
 			asprintf(&topic, MQTT_PREFIX "/led%u", i);
-			esp_mqtt_client_subscribe(client, topic, 0);
+			esp_mqtt_client_subscribe(mqtt_client, topic, 0);
 			free(topic);
 
 			asprintf(&topic, MQTT_PREFIX "/led%u/switch", i);
-			esp_mqtt_client_subscribe(client, topic, 0);
+			esp_mqtt_client_subscribe(mqtt_client, topic, 0);
 			free(topic);
 		}
 
-		/* now connected */
-		xEventGroupSetBits(event_group, MQTT_CONNECTED_BIT);
-		xEventGroupClearBits(event_group, MQTT_CONNECTING_BIT);
 		break;
 
 	case MQTT_EVENT_DISCONNECTED:
@@ -146,7 +152,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 			}
 
 			sprintf(s_temp, "%u,%u,%u", ch[choff].value, ch[choff + 1].value, ch[choff + 2].value);
-			esp_mqtt_client_publish(client, (choff ? MQTT_PREFIX "/rgb1/state" : MQTT_PREFIX "/rgb0/state"), s_temp, 0, MQTT_QOS, MQTT_RETAIN);
+			mqtt_publish((choff ? MQTT_PREFIX "/rgb1/state" : MQTT_PREFIX "/rgb0/state"), s_temp);
 		} else if (strncmp(event->topic, MQTT_PREFIX "/rgb0/switch", event->topic_len) == 0 || strncmp(event->topic, MQTT_PREFIX "/rgb1/switch", event->topic_len) == 0) {
 			int choff = event->topic[event->topic_len - 8] == '0' ? 0 : 3;
 			bool sw = strncmp("ON", event->data, event->data_len) == 0;
@@ -156,10 +162,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 				pwm_set_duty(&pwm, i, sw ? ch[choff + i].value : 0);
 			}
 
-			esp_mqtt_client_publish(client, (choff ? MQTT_PREFIX "/rgb1/switch/state" : MQTT_PREFIX "/rgb0/switch/state"), sw ? "ON" : "OFF", 0, MQTT_QOS, MQTT_RETAIN);
+			mqtt_publish((choff ? MQTT_PREFIX "/rgb1/switch/state" : MQTT_PREFIX "/rgb0/switch/state"), sw ? "ON" : "OFF");
 			if (sw) {
 				sprintf(s_temp, "%u,%u,%u", ch[choff].value, ch[choff + 1].value, ch[choff + 2].value);
-				esp_mqtt_client_publish(client, (choff ? MQTT_PREFIX "/rgb1/state" : MQTT_PREFIX "/rgb0/state"), s_temp, 0, MQTT_QOS, MQTT_RETAIN);
+				mqtt_publish((choff ? MQTT_PREFIX "/rgb1/state" : MQTT_PREFIX "/rgb0/state"), s_temp);
 			}
 		} else {
 			int c, sw = -1;
@@ -195,7 +201,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 			if (sw > -1) {
 				ch[c].state = sw;
 				asprintf(&topic, MQTT_PREFIX "/led%u/switch/state", c);
-				esp_mqtt_client_publish(client, topic, sw ? "ON" : "OFF", 0, MQTT_QOS, MQTT_RETAIN);
+				mqtt_publish(topic, sw ? "ON" : "OFF");
 				free(topic);
 			} else {
 				ch[c].value = value;
@@ -203,7 +209,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 			if (sw != 0) {
 				asprintf(&topic, MQTT_PREFIX "/led%u/state", c);
 				sprintf(s_temp, "%u", ch[c].value);
-				esp_mqtt_client_publish(client, topic, s_temp, 0, MQTT_QOS, MQTT_RETAIN);
+				mqtt_publish(topic, s_temp);
 				free(topic);
 			}
 			pwm_set_duty(&pwm, c, ch[c].state ? ch[c].value : 0);
@@ -273,9 +279,9 @@ void mqtt_connect(void)
 		/* static mqtt server defined */
 		INFO_MSG("wifi connected, using hardcoded MQTT server: %s", CONFIG_MQTT_BROKER_URL);
 		esp_mqtt_client_config_t mqtt_cfg = {
-		    .uri = CONFIG_MQTT_BROKER_URL,
-		    .username = CONFIG_MQTT_USERNAME,
-		    .password = CONFIG_MQTT_PASSWORD};
+			.uri = CONFIG_MQTT_BROKER_URL,
+			.username = CONFIG_MQTT_USERNAME,
+			.password = CONFIG_MQTT_PASSWORD};
 		mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
 		esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, mqtt_client);
 		esp_mqtt_client_start(mqtt_client);
@@ -300,15 +306,69 @@ void mqtt_connect(void)
 		/* connect to mqtt */
 		INFO_MSG("found mqtt server using mDNS: %s:%u", host, port);
 		esp_mqtt_client_config_t mqtt_cfg = {
-		    .host = host,
-		    .port = port,
-		    .username = CONFIG_MQTT_USERNAME,
-		    .password = CONFIG_MQTT_PASSWORD};
+			.host = host,
+			.port = port,
+			.username = CONFIG_MQTT_USERNAME,
+			.password = CONFIG_MQTT_PASSWORD};
 		mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
 		esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, mqtt_client);
 		esp_mqtt_client_start(mqtt_client);
 		free(host);
 	}
+}
+
+void adjust_all_channels(int value, bool relative)
+{
+	char s_temp[128];
+
+	/* each channel */
+	for (int i = 0; i < 6; i++) {
+		/* adjust value and clip value between 0 and 255 */
+		int v = (relative ? (int)ch[i].value : 0) + value;
+		if (v < 0) {
+			v = 0;
+		} else if (v > 255) {
+			v = 255;
+		}
+		/* set value */
+		ch[i].value = (uint8_t)v;
+		pwm_set_duty(&pwm, i, ch[i].state ? ch[i].value : 0);
+		char *topic = NULL;
+		asprintf(&topic, MQTT_PREFIX "/led%u/state", i);
+		sprintf(s_temp, "%u", ch[i].value);
+		mqtt_publish(topic, s_temp);
+		free(topic);
+	}
+
+	/* first RGB channel */
+	sprintf(s_temp, "%u,%u,%u", ch[0].value, ch[1].value, ch[2].value);
+	mqtt_publish(MQTT_PREFIX "/rgb0/state", s_temp);
+
+	/* second RGB channel */
+	sprintf(s_temp, "%u,%u,%u", ch[0].value, ch[1].value, ch[2].value);
+	mqtt_publish(MQTT_PREFIX "/rgb1/state", s_temp);
+}
+
+void switch_all_channels(bool on)
+{
+	char s_temp[128];
+	sprintf(s_temp, "%s", on ? "ON" : "OFF");
+
+	/* each channel */
+	for (int i = 0; i < 6; i++) {
+		/* set value */
+		ch[i].state = on;
+		pwm_set_duty(&pwm, i, ch[i].state ? ch[i].value : 0);
+		char *topic = NULL;
+		asprintf(&topic, MQTT_PREFIX "/led%u/switch/state", i);
+		mqtt_publish(topic, s_temp);
+		free(topic);
+	}
+
+	/* first RGB channel */
+	mqtt_publish(MQTT_PREFIX "/rgb0/switch/state", s_temp);
+	/* second RGB channel */
+	mqtt_publish(MQTT_PREFIX "/rgb1/switch/state", s_temp);
 }
 
 int app_main(int argc, char *argv[])
@@ -324,7 +384,6 @@ int app_main(int argc, char *argv[])
 
 	/* motion sensor */
 #ifdef USE_MOTION_SENSOR
-	gpio_reset_pin(MOTION_SENSOR_GPIO);
 	gpio_input(MOTION_SENSOR_GPIO);
 #endif
 
@@ -367,11 +426,14 @@ int app_main(int argc, char *argv[])
 		if (motion_sensor_now != motion_sensor_last) {
 			motion_sensor_t = os_timef() + MOTION_SENSOR_ON_TIME;
 			motion_sensor_last = motion_sensor_now;
-            /* on */
+			/* on */
+			switch_all_channels(true);
 		}
-		if (motion_sensor_t < os_timef()) {
-            /* off */
-        }
+		if (motion_sensor_t > 0 && motion_sensor_t < os_timef()) {
+			/* off */
+			switch_all_channels(false);
+			motion_sensor_t = 0;
+		}
 #endif
 
 		/* check for smartconfig button */
@@ -412,51 +474,15 @@ int app_main(int argc, char *argv[])
 			adc_read_t += 1;
 			t_send_counter++;
 			if (t_send_counter >= 60) {
-				if (xEventGroupGetBits(event_group) & MQTT_CONNECTED_BIT) {
-					sprintf(s_temp, "%d", (int)(t_mean / (float)t_send_counter));
-					esp_mqtt_client_publish(mqtt_client, MQTT_PREFIX "/temperature", s_temp, 0, MQTT_QOS, MQTT_RETAIN);
-				}
+				sprintf(s_temp, "%d", (int)(t_mean / (float)t_send_counter));
+				mqtt_publish(MQTT_PREFIX "/temperature", s_temp);
 				t_send_counter = 0;
 				t_mean = 0;
 			}
 			/* check temperature each time around and adjust PWM values lower if needed */
 			if (t_now > TEMPERATURE_LIMIT) {
 				WARN_MSG("temperature over limit: %.0f°C > %.0f°C", t_now, TEMPERATURE_LIMIT);
-
-				/* each channel */
-				bool rgb0_changed = false, rgb1_changed = false;
-				for (int i = 0; i < 6; i++) {
-					/* skip if channel is off or at zero */
-					if (!ch[i].state || ch[i].value < 1) {
-						continue;
-					}
-					/* only send changed rgb channels later */
-					if (i < 3) {
-						rgb0_changed = true;
-					} else {
-						rgb1_changed = true;
-					}
-					/* decrease only by one if we are under maximum */
-					ch[i].value -= (t_now < TEMPERATURE_MAX ? 1 : 5);
-					pwm_set_duty(&pwm, i, ch[i].state ? ch[i].value : 0);
-					char *topic = NULL;
-					asprintf(&topic, MQTT_PREFIX "/led%u/state", i);
-					sprintf(s_temp, "%u", ch[i].value);
-					esp_mqtt_client_publish(mqtt_client, topic, s_temp, 0, MQTT_QOS, MQTT_RETAIN);
-					free(topic);
-				}
-
-				/* first RGB channel */
-				if (rgb0_changed) {
-					sprintf(s_temp, "%u,%u,%u", ch[0].value, ch[1].value, ch[2].value);
-					esp_mqtt_client_publish(mqtt_client, MQTT_PREFIX "/rgb0/state", s_temp, 0, MQTT_QOS, MQTT_RETAIN);
-				}
-
-				/* second RGB channel */
-				if (rgb1_changed) {
-					sprintf(s_temp, "%u,%u,%u", ch[0].value, ch[1].value, ch[2].value);
-					esp_mqtt_client_publish(mqtt_client, MQTT_PREFIX "/rgb1/state", s_temp, 0, MQTT_QOS, MQTT_RETAIN);
-				}
+				adjust_all_channels(t_now < TEMPERATURE_MAX ? -1 : -5, true);
 			}
 		}
 

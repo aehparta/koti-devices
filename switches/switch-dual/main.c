@@ -93,13 +93,14 @@ void main(void)
 	p_init();
 
 	struct koti_nrf_pck_broadcast_uuid pck;
-	memcpy(pck.uuid, uuid, 16);
+	memset(&pck, 0, sizeof(pck));
+	memcpy(pck.uuid_short, uuid + 8, sizeof(pck.uuid_short));
 
 	while (1) {
 		SLEEP();
 		IOCCF = 0;
 
-		/* read hall */
+		/* read buttons */
 		uint8_t btn1 = gpio_read(BTN1);
 		uint8_t btn2 = gpio_read(BTN2);
 
