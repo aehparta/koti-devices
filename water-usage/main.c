@@ -14,26 +14,21 @@
 #pragma config LPBOREN = OFF
 #pragma config CSWEN = ON
 
-
-#define HALL_PIN_EN     GPIOB7
+#define HALL_PIN_EN GPIOB7
 #define HALL_PIN_EN_BIT LATBbits.LATB7
-#define HALL_PIN_READ   GPIOC7
+#define HALL_PIN_READ GPIOC7
 
-
-#define TIMER_HZ        20
+#define TIMER_HZ 20
 #define HALL_PULSES_CNT (65536 - 60) /* pulses per litre */
-#define HALL_WAIT       2 /* seconds */
+#define HALL_WAIT 2                  /* seconds */
 
-#define SEND_DELAY      10
-
-
+#define SEND_DELAY 10
 
 struct spi_master master;
 #ifdef USE_BLE
 struct nrf24l01p_ble_device nrf_ble;
-uint8_t mac[6] = { 0x17, 0x17, 'B', 'E', 'B', 'T' };
+uint8_t mac[6] = {0x17, 0x17, 'B', 'E', 'B', 'T'};
 #endif
-
 
 void p_init(void)
 {
@@ -180,7 +175,8 @@ void main(void)
 				/* enable adc/fvr */
 				FVRMD = 0;
 				ADCMD = 0;
-				while (!FVRRDY);
+				while (!FVRRDY)
+					;
 				FVRCON = 0x81;
 				ADPCH = 0x3e;
 				ADCLK = 2;
@@ -188,11 +184,13 @@ void main(void)
 
 				/* do one conversion before actual conversion, for some reason things are not stable yet */
 				ADCON0bits.GO = 1;
-				while (ADCON0bits.GO);
+				while (ADCON0bits.GO)
+					;
 
 				/* calculate battery voltage with 100mV precision */
 				ADCON0bits.GO = 1;
-				while (ADCON0bits.GO);
+				while (ADCON0bits.GO)
+					;
 
 				/* (2048 * 2048 * 16) / ADRES = millivolts:
 				 *  - ADRES = 22370 = 3.0V or ADRESH = 87
@@ -218,7 +216,7 @@ void main(void)
 				pck.hdr.flags = 0;
 				pck.hdr.type = 0;
 				pck.hdr.bat = (uint8_t)vbat;
-				pck.u32[0] = litres;
+				pck.u32 = litres;
 				nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
 #else
 				buf[0] = 4;
