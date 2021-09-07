@@ -7,10 +7,16 @@ sdkconfig*
 *.p1
 *.rlf
 *.lst
+*.as
+*.obj
+*.map
 *PIC8.cmf
 *PIC8.hxl
 *PIC8.sdb
 *PIC8.sym
 *PIC8.hex
 *PIC8.s
+__pycache__/
+device-uuid.h
+device-uuid.txt
 

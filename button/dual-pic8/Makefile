@@ -15,9 +15,9 @@ DEFINES_PIC8 += NRF24L01P_HARDCODED_CE=GPIOC1
 include $(KOTI_PATH)/init.mk
 
 # our own sources etc
-BUILD_BINS = wu
-PROGRAM_BIN = wu
-wu_SRC = main.c $(libe_SRC) $(koti_nrf_SRC)
+BUILD_BINS = bdual
+PROGRAM_BIN = bdual
+bdual_SRC = main.c $(libe_SRC) $(koti_nrf_SRC)
 
 # build
 include $(KOTI_PATH)/build.mk

@@ -1,20 +1,18 @@
-from socket import *
 from pyRC5 import RC5
-from uuid import UUID
 
-s = socket(AF_INET, SOCK_DGRAM)
-s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
-s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-s.bind(('', 17117))
+ENC_RC5 = 0
+ENC_AES128 = 1
+ENC_AES128 = 2
+ENC_NONE = 3
 
-uuid_prefix = b'\0\0\0\0\0\0\0\0'
-
-key = b'12345678\0\0\0\0\0\0\0\0'
-rc5 = RC5.RC5(32, 12, key)
-
-def rc5_decrypt(data):
+def decrypt_rc5(data, key):
     data = bytearray(data)
+    # clear ttl
+    data[0] &= 0xfc
+    
     enc_blocks = (data[0] & 0x30) >> 4
+
+    rc5 = RC5.RC5(32, 12, key)
 
     if enc_blocks >= 3:
         block = rc5.decryptBlock(data[24:32])
@@ -37,18 +35,9 @@ def rc5_decrypt(data):
 
     return bytes(data)
 
-while True:
-    data = bytearray(s.recv(1024))
-
-    # clear ttl
-    data[0] &= 0xfc
-
-    to = data[1]
+def decrypt(data):
     enc = (data[0] & 0xc0) >> 6
+    key = b'12345678\0\0\0\0\0\0\0\0'
 
-    data = rc5_decrypt(data)
-
-    print(data.hex(' '))
-
-    uuid = UUID(bytes=uuid_prefix + data[24:32])
-    print(uuid)
+    if enc == ENC_RC5:
+        return decrypt_rc5(data, key)

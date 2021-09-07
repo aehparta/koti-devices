@@ -1,0 +1,10 @@
+mqtt:
+  host: iot.lan
+  port: 1883
+  username:
+  password:
+  prefix: koti/devices/
+
+devices:
+  00000000-0000-0000-976b-afd3633b3efd:
+    key: '12345678'
