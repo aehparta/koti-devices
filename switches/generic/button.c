@@ -38,8 +38,6 @@ bool button_on(uint8_t sw)
 	if (sw >= BUTTON_COUNT) {
 		return false;
 	}
-	if (!buttons[sw]) {
-	}
 	buttons[sw] = true;
 	button_send_states();
 	return true;
@@ -66,9 +64,9 @@ bool button_toggle(uint8_t sw)
 void button_send_states(void)
 {
 	struct koti_nrf_pck_broadcast_uuid pck;
-	memcpy(pck.uuid, uuid, 16);
-	
-	pck.hdr.flags = 0;
+	memcpy(pck.uuid_short, uuid + 8, 8);
+
+	pck.hdr.flags = KOTI_NRF_ENC_BLOCKS_3;
 	pck.hdr.bat = 0;
 	pck.hdr.type = KOTI_NRF_TYPE_BUTTONS;
 	memset(pck.data, 0, sizeof(pck.data));

@@ -99,6 +99,8 @@ int8_t nrf24l01p_koti_recv(void *p)
 		return n;
 	}
 
+	HEX_DUMP(pck, sizeof(*pck), 1);
+
 	/* clear ttl for possible encryption iv usage */
 	pck->hdr.flags &= ~KOTI_NRF_FLAG_TTL_MASK;
 

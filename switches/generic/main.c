@@ -50,7 +50,9 @@ int p_init(int argc, char *argv[])
 void p_exit(int retval)
 {
 	nrf24l01p_koti_quit();
-	// spi_master_close(&master);
+#ifdef USE_SPI
+	spi_master_close(&master);
+#endif
 	web_quit();
 	log_quit();
 	os_quit();

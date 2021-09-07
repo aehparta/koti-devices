@@ -1,5 +1,5 @@
 const baseurl = "";
-let switch_count = 2;
+let switch_count = 8;
 
 const switch_update = (id, state) => {
   const sw = $(".switch[switch=" + id + "]");
