@@ -1,5 +1,5 @@
 /*
- * Water usage sensor using PIC16LF18345.
+ * Two button controller using 8-bit PIC.
  */
 
 #include <koti.h>
@@ -72,7 +72,7 @@ void p_init(void)
 	PMD4 = 0xfd; /* spi enabled */
 	PMD5 = 0xff;
 
-	/* enable pint interrupts */
+	/* enable pin interrupts */
 	PIE0bits.IOCIE = 1;
 
 	/* Timer0 wakes up the cpu once and a while */
@@ -105,7 +105,7 @@ void main(void)
 		uint8_t btn2 = gpio_read(BTN2);
 
 		/* send */
-		pck.hdr.flags = 0;
+		pck.hdr.flags = KOTI_NRF_ENC_BLOCKS_1;
 		pck.hdr.bat = 0;
 		pck.hdr.type = KOTI_NRF_TYPE_BUTTONS;
 		memset(pck.data, 0, sizeof(pck.data));

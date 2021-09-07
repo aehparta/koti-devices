@@ -1,7 +1,6 @@
 
 #include "nrf.h"
 
-
 #ifdef USE_DRIVER_NRF24L01P
 struct nrf24l01p_device nrf;
 #endif
@@ -80,6 +79,8 @@ void nrf24l01p_koti_set_key(uint8_t *key, uint8_t size)
 int8_t nrf24l01p_koti_recv(void *p)
 {
 	struct koti_nrf_pck *pck = p;
+	uint8_t *p8 = p;
+	uint8_t i = 0;
 	int8_t n = 0;
 
 #ifdef USE_DRIVER_NRF24L01P
@@ -103,27 +104,30 @@ int8_t nrf24l01p_koti_recv(void *p)
 
 	/* encryption being zero is same as RC5 */
 	if (!(pck->hdr.flags & KOTI_NRF_ENC_MASK)) {
-		/* third block: only if second bit is set */
-		if (pck->hdr.flags & KOTI_NRF_ENC_BLOCKS_3) {
+		uint8_t eb = pck->hdr.flags & KOTI_NRF_ENC_BLOCKS_MASK;
+
+		switch (eb) {
+		case KOTI_NRF_ENC_BLOCKS_3:
+			/* third data block */
 			rc5_decrypt(&rc5, pck->data + 16);
-			for (uint8_t i = 8; i < 16; i++) {
-				/* de-apply iv */
+			for (i = 8; i < 16; i++) {
 				pck->data[i + 8] ^= pck->data[i];
 			}
-		}
-		/* second block: always if more than first block should be encrypted */
-		if (pck->hdr.flags & KOTI_NRF_ENC_BLOCKS_MASK) {
+		case KOTI_NRF_ENC_BLOCKS_2:
+			/* second data block */
 			rc5_decrypt(&rc5, pck->data + 8);
-			for (uint8_t i = 0; i < 8; i++) {
-				/* apply iv */
+			for (i = 0; i < 8; i++) {
 				pck->data[i + 8] ^= pck->data[i];
 			}
-		}
-		/* first block */
-		rc5_decrypt(&rc5, pck->data);
-		for (uint8_t i = 0; i < 8; i++) {
-			/* de-apply iv */
-			pck->data[i] ^= pck->iv[i];
+		case KOTI_NRF_ENC_BLOCKS_1:
+			/* first data block */
+			rc5_decrypt(&rc5, pck->data);
+			for (i = 0; i < 8; i++) {
+				pck->data[i] ^= p8[i];
+			}
+		case KOTI_NRF_ENC_BLOCKS_0:
+			/* first part which includes part of header */
+			rc5_decrypt(&rc5, pck->data - 6);
 		}
 	}
 
@@ -140,6 +144,8 @@ int8_t nrf24l01p_koti_recv(void *p)
 int8_t nrf24l01p_koti_send(uint8_t to, uint8_t from, void *p)
 {
 	struct koti_nrf_pck *pck = p;
+	uint8_t *p8 = p;
+	uint8_t i = 0;
 	int8_t n = 0;
 
 	/* set to and from */
@@ -152,37 +158,42 @@ int8_t nrf24l01p_koti_send(uint8_t to, uint8_t from, void *p)
 	/* set sequence number and increase it, this is mostly to make encryption iv change always */
 	pck->hdr.seq = sequence++;
 
-	/* also set random number to further randomize header as iv */
-	pck->hdr.iv_rand = (uint8_t)rand();
+	/* make encrypted data more random  */
+	pck->hdr.rand = (uint8_t)rand();
 
 	/* calculate crc */
 	pck->hdr.crc = crc8_dallas(pck->data, KOTI_NRF_SIZE_PAYLOAD);
 
 	/* encryption being zero is same as RC5 */
 	if (!(pck->hdr.flags & KOTI_NRF_ENC_MASK)) {
-		/* first block */
-		for (uint8_t i = 0; i < 8; i++) {
-			/* apply iv */
-			pck->data[i] ^= pck->iv[i];
-		}
-		rc5_encrypt(&rc5, pck->data);
-		/* second block: always if more than first block should be encrypted */
-		if (pck->hdr.flags & KOTI_NRF_ENC_BLOCKS_MASK) {
-			for (uint8_t i = 0; i < 8; i++) {
-				/* apply iv */
-				pck->data[i + 8] ^= pck->data[i];
+		uint8_t eb = pck->hdr.flags & KOTI_NRF_ENC_BLOCKS_MASK;
+
+		/* first part which includes part of header */
+		rc5_encrypt(&rc5, pck->data - 6);
+
+		/* first data block */
+		if (eb >= KOTI_NRF_ENC_BLOCKS_1) {
+			for (i = 0; i < 8; i++) {
+				pck->data[i] ^= p8[i];
 			}
-			rc5_encrypt(&rc5, pck->data + 8);
-		}
-		/* third block: only if second bit is set */
-		if (pck->hdr.flags & KOTI_NRF_ENC_BLOCKS_3) {
-			for (uint8_t i = 8; i < 16; i++) {
-				/* apply iv */
-				pck->data[i + 8] ^= pck->data[i];
+			rc5_encrypt(&rc5, pck->data);
+			/* second data block */
+			if (eb >= KOTI_NRF_ENC_BLOCKS_2) {
+				for (i = 0; i < 8; i++) {
+					pck->data[i + 8] ^= pck->data[i];
+				}
+				rc5_encrypt(&rc5, pck->data + 8);
+				/* third data block */
+				if (eb >= KOTI_NRF_ENC_BLOCKS_3) {
+					for (i = 8; i < 16; i++) {
+						pck->data[i + 8] ^= pck->data[i];
+					}
+					rc5_encrypt(&rc5, pck->data + 16);
+				}
 			}
-			rc5_encrypt(&rc5, pck->data + 16);
 		}
 	}
+
 #ifdef USE_AES
 	/* implement aes */
 #endif

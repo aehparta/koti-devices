@@ -69,6 +69,8 @@ extern "C" {
 /* RC5 is for small target encryptions.
  * Security-wise it is quite well tested and pretty much enough for most IOT stuff.
  * (should do performance analysis compared to power usage in 8-bit PICs and AVR)
+ * 
+ * RC5 is roughly 5 times faster than AES128 in 8-bit PIC.
  */
 #define KOTI_NRF_ENC_RC5 0x00
 #define KOTI_NRF_ENC_AES128 0x40
@@ -87,40 +89,29 @@ extern "C" {
 
 /* basic header structure */
 struct koti_nrf_header {
-	union {
-		struct {
-			/* receiver id */
-			uint8_t to;
-			/* sender id */
-			uint8_t from;
-			/* sender specific incremental sequence number */
-			uint8_t seq;
-			/* this is to make header use as iv better and also to make id more unique */
-			uint8_t iv_rand;
-		};
-		/* unique packet id used for forwarding single packet only once, consist all fields from struct above */
-		uint32_t id;
-	};
-
 	/* flag bits:
 	 *  0-1: ttl, 2 bits (must be zero when using header as iv)
 	 *  2: acknowledge
-	 *  4-5: 8-byte blocks of payload encrypted (0: first block only, 1: first 2 blocks, 2 or 3: all of it)
+	 *  4-5: 8-byte blocks of payload encrypted
 	 *  6-7: encryption used
 	 */
 	uint8_t flags;
+	/* receiver id */
+	uint8_t to;
 
-	/* battery bits:
-	 *  0-5: battery voltage with 100mV precision (63=6.3V, 33=3.3V, ..) or zero if not available
-	 *  6: ?
-	 *  7: battery charge state, 0 = empty or nearly empty, 1 = ok
-	 */
+	/* encryption starts here */
+	/* sender id */
+	uint8_t from;
+	/* sender specific incremental sequence number */
+	uint8_t seq;
+	/* this is to make encrypted data more random */
+	uint8_t rand;
+
+	/* battery charge percentage */
 	uint8_t bat;
-
-	/* 
-	 * packet type and unencrypted payload crc-8
-	 */
+	/*  packet type */
 	uint8_t type;
+	/* unencrypted payload crc-8 */
 	uint8_t crc;
 };
 
@@ -135,12 +126,7 @@ struct koti_nrf_time {
 
 /* main packet structure */
 struct koti_nrf_pck {
-	/* header */
-	union {
-		struct koti_nrf_header hdr;
-		/* header as IV (initialization vector) */
-		uint8_t iv[8];
-	};
+	struct koti_nrf_header hdr;
 	/* payload */
 	union {
 		/* as bytes */
@@ -160,12 +146,7 @@ struct koti_nrf_pck {
 
 /* one way packet structure with embedded uuid */
 struct koti_nrf_pck_broadcast_uuid {
-	/* header */
-	union {
-		struct koti_nrf_header hdr;
-		/* header as IV (initialization vector) */
-		uint8_t iv[8];
-	};
+	struct koti_nrf_header hdr;
 	/* payload */
 	union {
 		/* as bytes */
