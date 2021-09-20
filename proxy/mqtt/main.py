@@ -1,13 +1,11 @@
 from socket import *
 from uuid import UUID
-from decrypt import decrypt
-import config
 from mqtt import MQTT
+from decrypt import decrypt
+import cfg
 
-cfg = config.load()
-mqtt = MQTT(cfg['mqtt'])
-
-# print(cfg)
+cfg.load()
+mqtt = MQTT()
 
 s = socket(AF_INET, SOCK_DGRAM)
 s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
@@ -23,7 +21,7 @@ while True:
     print(data.hex(' '))
 
     uuid = UUID(bytes=uuid_prefix + data[24:32])
-    
+
     if data[9] != 0:
         mqtt.publish('e7b4202e-0ced-11ec-ab05-fb55d0334872/led1/switch', 'ON')
     else:

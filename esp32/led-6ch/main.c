@@ -1,5 +1,5 @@
 /*
- * 6-channel LED board.
+ * 6-channel PWM (LED) controller.
  */
 
 #include <libe/libe.h>
@@ -61,8 +61,12 @@ struct channel ch[6] = {{4, 0, 0}, {2, 0, 0}, {18, 0, 0}, {19, 0, 0}, {23, 0, 0}
 
 /* motions sensor support: enable using RXD0 as on/off switch input with timer */
 #ifdef USE_MOTION_SENSOR
+#ifndef MOTION_SENSOR_GPIO
 #define MOTION_SENSOR_GPIO 0
+#endif
+#ifndef MOTION_SENSOR_ON_TIME
 #define MOTION_SENSOR_ON_TIME 30.0 /* seconds */
+#endif
 #endif
 
 static EventGroupHandle_t event_group;
@@ -135,37 +139,38 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 	case MQTT_EVENT_DATA:
 		INFO_MSG("MQTT data, %.*s: %.*s", event->topic_len, event->topic, event->data_len, event->data);
 
-		if (strncmp(event->topic, MQTT_PREFIX "/rgb0", event->topic_len) == 0 || strncmp(event->topic, MQTT_PREFIX "/rgb1", event->topic_len) == 0) {
-			int choff = event->topic[event->topic_len - 1] == '0' ? 0 : 3;
+		if (strncmp(event->topic, MQTT_PREFIX "/rgb0", event->topic_len) == 0 ||
+		    strncmp(event->topic, MQTT_PREFIX "/rgb1", event->topic_len) == 0) {
+			int ch_off = event->topic[event->topic_len - 1] == '0' ? 0 : 3;
 			char *vfree = strndup(event->data, event->data_len), *v = vfree;
 
 			for (int i = 0; i < 3; i++) {
 				char *b = strsep(&v, ",");
 				if (b && atoi(b) >= 0 && atoi(b) <= 255) {
-					ch[choff + i].value = atoi(b);
+					ch[ch_off + i].value = atoi(b);
 				}
 			}
 			free(vfree);
 
 			for (int i = 0; i < 3; i++) {
-				pwm_set_duty(&pwm, i, ch[choff].state ? ch[choff + i].value : 0);
+				pwm_set_duty(&pwm, i, ch[ch_off].state ? ch[ch_off + i].value : 0);
 			}
 
-			sprintf(s_temp, "%u,%u,%u", ch[choff].value, ch[choff + 1].value, ch[choff + 2].value);
-			mqtt_publish((choff ? MQTT_PREFIX "/rgb1/state" : MQTT_PREFIX "/rgb0/state"), s_temp);
+			sprintf(s_temp, "%u,%u,%u", ch[ch_off].value, ch[ch_off + 1].value, ch[ch_off + 2].value);
+			mqtt_publish((ch_off ? MQTT_PREFIX "/rgb1/state" : MQTT_PREFIX "/rgb0/state"), s_temp);
 		} else if (strncmp(event->topic, MQTT_PREFIX "/rgb0/switch", event->topic_len) == 0 || strncmp(event->topic, MQTT_PREFIX "/rgb1/switch", event->topic_len) == 0) {
-			int choff = event->topic[event->topic_len - 8] == '0' ? 0 : 3;
+			int ch_off = event->topic[event->topic_len - 8] == '0' ? 0 : 3;
 			bool sw = strncmp("ON", event->data, event->data_len) == 0;
 
 			for (int i = 0; i < 3; i++) {
-				ch[choff + i].state = sw;
-				pwm_set_duty(&pwm, i, sw ? ch[choff + i].value : 0);
+				ch[ch_off + i].state = sw;
+				pwm_set_duty(&pwm, i, sw ? ch[ch_off + i].value : 0);
 			}
 
-			mqtt_publish((choff ? MQTT_PREFIX "/rgb1/switch/state" : MQTT_PREFIX "/rgb0/switch/state"), sw ? "ON" : "OFF");
+			mqtt_publish((ch_off ? MQTT_PREFIX "/rgb1/switch/state" : MQTT_PREFIX "/rgb0/switch/state"), sw ? "ON" : "OFF");
 			if (sw) {
-				sprintf(s_temp, "%u,%u,%u", ch[choff].value, ch[choff + 1].value, ch[choff + 2].value);
-				mqtt_publish((choff ? MQTT_PREFIX "/rgb1/state" : MQTT_PREFIX "/rgb0/state"), s_temp);
+				sprintf(s_temp, "%u,%u,%u", ch[ch_off].value, ch[ch_off + 1].value, ch[ch_off + 2].value);
+				mqtt_publish((ch_off ? MQTT_PREFIX "/rgb1/state" : MQTT_PREFIX "/rgb0/state"), s_temp);
 			}
 		} else {
 			int c, sw = -1;

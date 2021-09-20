@@ -5,11 +5,12 @@ ENC_AES128 = 1
 ENC_AES128 = 2
 ENC_NONE = 3
 
+
 def decrypt_rc5(data, key):
     data = bytearray(data)
     # clear ttl
     data[0] &= 0xfc
-    
+
     enc_blocks = (data[0] & 0x30) >> 4
 
     rc5 = RC5.RC5(32, 12, key)
@@ -34,6 +35,7 @@ def decrypt_rc5(data, key):
         data[i + 2] = block[i]
 
     return bytes(data)
+
 
 def decrypt(data):
     enc = (data[0] & 0xc0) >> 6

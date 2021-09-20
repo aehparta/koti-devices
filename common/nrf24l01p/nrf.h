@@ -21,11 +21,11 @@ extern "C" {
 #define KOTI_NRF_SIZE (KOTI_NRF_SIZE_HEADER + KOTI_NRF_SIZE_PAYLOAD)
 
 /* broadcast ID */
-#define KOTI_NRF_ID_BROADCAST 0x00
-/* used to send packets to bridges only */
-#define KOTI_NRF_ID_BRIDGE 0x01
-/* sender id for a data packet that contains uuid (device has no valid id or does not even use one) */
-#define KOTI_NRF_ID_UUID 0x02
+#define KOTI_NRF_ID_BROADCAST 255
+/* id for a data packet that contains uuid
+ * device has no valid id yet or does not even use one
+ */
+#define KOTI_NRF_ID_UUID 254
 
 /* nrf packet types (0-127) */
 #define KOTI_NRF_TYPE_HELLO 0
@@ -145,7 +145,7 @@ struct koti_nrf_pck {
 };
 
 /* one way packet structure with embedded uuid */
-struct koti_nrf_pck_broadcast_uuid {
+struct koti_nrf_pck_uuid {
 	struct koti_nrf_header hdr;
 	/* payload */
 	union {
@@ -160,8 +160,10 @@ struct koti_nrf_pck_broadcast_uuid {
 		/* 64-bit unsigned ints */
 		uint64_t u64[2];
 	};
-	/* uuid */
-	uint8_t uuid_short[8];
+	/* short uuid, 64 least significant bits
+	 * 64 most significant bits are added by proxy
+	 */
+	uint8_t uuid_lsb[8];
 };
 
 /* IMPORTANT */
