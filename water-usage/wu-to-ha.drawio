@@ -1,1 +1,64 @@
-<mxfile host="app.diagrams.net" modified="2021-09-24T13:53:57.723Z" agent="5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36" version="15.3.1" etag="82L78IBweT5l7wq3zl4n" type="github"><diagram id="muo0tK1TzHxvhwew609w">UzV2zq1wL0osyPDNT0nNUTV2VTV2LsrPL4GwciucU3NyVI0MMlNUjV1UjYwMgFjVyA2HrCFY1qAgsSg1rwSLBiADYTaQg2Y1AA==</diagram></mxfile>
+<mxfile host="app.diagrams.net" modified="2021-09-24T15:01:44.892Z" agent="5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36" etag="Pwi3_QW7MIOdJB2IzdPQ" version="15.3.1" type="github">
+  <diagram id="muo0tK1TzHxvhwew609w" name="Page-1">
+    <mxGraphModel dx="593" dy="346" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-7" value="" style="verticalLabelPosition=bottom;aspect=fixed;html=1;verticalAlign=top;strokeColor=#6c8ebf;fillColor=#dae8fc;align=center;outlineConnect=0;shape=mxgraph.fluid_power.x11920;points=[[0.22,0,0],[0.22,1,0]]" vertex="1" parent="1">
+          <mxGeometry x="110" y="194.48" width="80" height="71.68" as="geometry" />
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-8" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#6CAE3E;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.iot_device_gateway;" vertex="1" parent="1">
+          <mxGeometry x="320" y="190.48000000000002" width="78" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-20" value="" style="endArrow=classic;html=1;strokeColor=default;" edge="1" parent="1" source="a6cmEFR6fznn1VUMm_I9-7" target="a6cmEFR6fznn1VUMm_I9-8">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="210" y="270" as="sourcePoint" />
+            <mxPoint x="260" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-21" value="&lt;font style=&quot;font-size: 11px&quot;&gt;radio message&lt;/font&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="a6cmEFR6fznn1VUMm_I9-20">
+          <mxGeometry x="-0.4356" y="1" relative="1" as="geometry">
+            <mxPoint x="23" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-22" value="&lt;font style=&quot;font-size: 12px&quot;&gt;water flow sensor&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="130" y="150" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-23" value="&lt;font style=&quot;font-size: 11px&quot;&gt;radio-to-lan gateway&lt;br&gt;nRF24L01+ -&amp;gt; LAN broadcast&lt;br&gt;&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="299" y="150" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-24" value="" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.mqtt_protocol;fillColor=#5294CF;gradientColor=none;" vertex="1" parent="1">
+          <mxGeometry x="600" y="196.48" width="63" height="66" as="geometry" />
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-25" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#6CAE3E;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.iot_device_gateway;" vertex="1" parent="1">
+          <mxGeometry x="460" y="191.32" width="78" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-26" value="" style="endArrow=classic;html=1;strokeColor=default;" edge="1" parent="1" target="a6cmEFR6fznn1VUMm_I9-25">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="230" as="sourcePoint" />
+            <mxPoint x="430" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-28" value="LAN" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="a6cmEFR6fznn1VUMm_I9-26">
+          <mxGeometry x="-0.241" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-27" value="" style="endArrow=classic;html=1;strokeColor=default;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="a6cmEFR6fznn1VUMm_I9-25" target="a6cmEFR6fznn1VUMm_I9-24">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="250" as="sourcePoint" />
+            <mxPoint x="430" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-31" value="LAN" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="a6cmEFR6fznn1VUMm_I9-27">
+          <mxGeometry x="-0.4221" relative="1" as="geometry">
+            <mxPoint x="4" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a6cmEFR6fznn1VUMm_I9-32" value="&lt;font style=&quot;font-size: 11px&quot;&gt;LAN broadcast to MQTT&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="449" y="150" width="100" height="20" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
