@@ -4,7 +4,16 @@ mqtt:
   username:
   password:
   prefix: koti/devices/
+  uuid_msb: 00000000-0000-0000
 
 devices:
-  00000000-0000-0000-976b-afd3633b3efd:
+  - uuid_lsb: 976b-afd3633b3efd
+    key: '12345678'
+    triggers:
+      - when:
+          button/0: PUSHED
+        actions:
+          e7b4202e-0ced-11ec-ab05-fb55d0334872/led1/switch: TOGGLE
+  - id: 0
+    uuid_lsb: 9999-999999999999
     key: '12345678'

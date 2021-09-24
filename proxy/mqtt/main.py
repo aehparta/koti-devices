@@ -1,8 +1,8 @@
 from socket import *
 from uuid import UUID
-from decrypt import decrypt
-import config
 from mqtt import MQTT
+from decrypt import decrypt
+import cfg
 
 cfg = config.load()
 mqtt = MQTT(cfg['mqtt'])
