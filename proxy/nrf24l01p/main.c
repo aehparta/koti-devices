@@ -105,6 +105,7 @@ int main(int argc, char *argv[])
 			HEX_DUMP(data, 32, 1);
 			broadcast_send(data, sizeof(data));
 		} else if (broadcast_recv(data, sizeof(data)) > 0) {
+			HEX_DUMP(data, 32, 1);
 			nrf24l01p_send(&nrf, data);
 		} else {
 			/* lets not waste all cpu if nothing happened */

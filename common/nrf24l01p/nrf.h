@@ -12,116 +12,61 @@ extern "C" {
 #endif
 
 /* nrf24l01p settings */
-#define KOTI_NRF_CHANNEL 17
+#define KOTI_NRF_CHANNEL 70
 #define KOTI_NRF_SPEED NRF24L01P_SPEED_250k
 
 /* basic nrf packet parts */
-#define KOTI_NRF_SIZE_HEADER 8
-#define KOTI_NRF_SIZE_PAYLOAD 24
+#define KOTI_NRF_SIZE_HEADER 12
+#define KOTI_NRF_SIZE_PAYLOAD 20
 #define KOTI_NRF_SIZE (KOTI_NRF_SIZE_HEADER + KOTI_NRF_SIZE_PAYLOAD)
 
-/* broadcast ID */
-#define KOTI_NRF_ID_BROADCAST 0x00
-/* used to send packets to bridges only */
-#define KOTI_NRF_ID_BRIDGE 0x01
-/* sender id for a data packet that contains uuid (device has no valid id or does not even use one) */
-#define KOTI_NRF_ID_UUID 0x02
-
-/* nrf packet types (0-127) */
-#define KOTI_NRF_TYPE_HELLO 0
-#define KOTI_NRF_TYPE_GET_ID 1
-#define KOTI_NRF_TYPE_SET_ID 2
-
-/* Temperature and humidity, 8 bytes:
+/* temperature and humidity, 8 bytes:
  *  4 bytes: temperature, float
  *  4 bytes: humidity, float
  */
-#define KOTI_NRF_TYPE_TH 3
+#define KOTI_NRF_TYPE_TH 0
 
-/* Pressure and windspeed, 8 bytes:
- *  4 bytes: pressure, float
- *  4 bytes: windspeed, float
+/* water flow in litres, 4 bytes:
+ *  4 bytes: water flow, uint32_t
  */
-#define KOTI_NRF_TYPE_PRESSURE_WINDSPEED 4
+#define KOTI_NRF_TYPE_WATER_FLOW_LITRE 1
 
-/* Water flow, 4 bytes:
- *  4 bytes: water flow, float
+/* water flow in millilitres, 8 bytes:
+ *  8 bytes: water flow, uint64_t
  */
-#define KOTI_NRF_TYPE_WATER_FLOW 5
+#define KOTI_NRF_TYPE_WATER_FLOW_MILLILITRE 2
 
-/* Simple buttons:
- * data[0]: number of buttons/switches
- * data[1-7]: each bit represents state
+/* simple click, 1 byte:
+ *  1 byte: id of clicked entity (button etc)
  */
-#define KOTI_NRF_TYPE_BUTTONS 6
+#define KOTI_NRF_TYPE_CLICK 2
 
 /* nrf packet flags */
 #define KOTI_NRF_FLAG_TTL_MASK 0x03
-
-/* ack flag */
-#define KOTI_NRF_ACK_BIT 0x04
-
-/* battery related */
-#define KOTI_NRF_BAT_VOLTAGE_MASK 0x3f
-#define KOTI_NRF_BAT_EMPTY_MASK 0x80
-
-/* encryption */
-/* RC5 is for small target encryptions.
- * Security-wise it is quite well tested and pretty much enough for most IOT stuff.
- * (should do performance analysis compared to power usage in 8-bit PICs and AVR)
- * 
- * RC5 is roughly 5 times faster than AES128 in 8-bit PIC.
- */
-#define KOTI_NRF_ENC_RC5 0x00
-#define KOTI_NRF_ENC_AES128 0x40
-#define KOTI_NRF_ENC_AES256 0x80
-#define KOTI_NRF_ENC_NONE 0xc0
-#define KOTI_NRF_ENC_MASK 0xc0
-
-#define KOTI_NRF_ENC_BLOCKS_0 0x00
-#define KOTI_NRF_ENC_BLOCKS_1 0x10
-#define KOTI_NRF_ENC_BLOCKS_2 0x20
-#define KOTI_NRF_ENC_BLOCKS_3 0x30
-#define KOTI_NRF_ENC_BLOCKS_MASK 0x30
+#define KOTI_NRF_FLAG_ENC_NONE 0x00
+#define KOTI_NRF_FLAG_ENC_1_BLOCK 0x04
+#define KOTI_NRF_FLAG_ENC_2_BLOCKS 0x08
+#define KOTI_NRF_FLAG_ENC_3_BLOCKS 0x0c
+#define KOTI_NRF_FLAG_ENC_BLOCKS_MASK 0x0c
 
 /* IMPORTANT */
 #pragma pack(1)
 
 /* basic header structure */
 struct koti_nrf_header {
+	uint8_t mac[6]; /* sender mac address */
 	/* flag bits:
-	 *  0-1: ttl, 2 bits (must be zero when using header as iv)
-	 *  2: acknowledge
-	 *  4-5: 8-byte blocks of payload encrypted
-	 *  6-7: encryption used
-	 */
+	*  0-1: ttl, 2 bits
+	*  2-3: 8-byte blocks of payload encrypted
+	*/
 	uint8_t flags;
-	/* receiver id */
-	uint8_t to;
-
-	/* encryption starts here */
-	/* sender id */
-	uint8_t from;
-	/* sender specific incremental sequence number */
 	uint8_t seq;
-	/* this is to make encrypted data more random */
-	uint8_t rand;
 
-	/* battery charge percentage */
-	uint8_t bat;
-	/*  packet type */
-	uint8_t type;
-	/* unencrypted payload crc-8 */
+	/* RC5 encryption starts here, if KOTI_NRF_FLAG_ENC_NONE is not set in flags */
 	uint8_t crc;
-};
-
-/* payload structures */
-
-struct koti_nrf_time {
-	uint32_t timestamp; /* unix timestamp */
-	int32_t timezone;   /* timezone offset in seconds */
-	int32_t latitude;   /* latitude in seconds */
-	int32_t longitude;  /* longitude in seconds */
+	uint8_t rand; /* this is to make encrypted data more random ("replace" iv) */
+	uint8_t bat;  /* battery charge percentage */
+	uint8_t type; /* unencrypted payload crc-8 */
 };
 
 /* main packet structure */
@@ -132,36 +77,14 @@ struct koti_nrf_pck {
 		/* as bytes */
 		uint8_t data[KOTI_NRF_SIZE_PAYLOAD];
 		/* 16-bit unsigned ints */
-		uint16_t u16[12];
+		uint16_t *u16;
 		/* 32-bit unsigned ints */
-		uint32_t u32[6];
+		uint32_t *u32;
 		/* floats */
-		float f32[6];
+		float *f32;
 		/* 64-bit unsigned ints */
-		uint64_t u64[3];
-		/* time */
-		struct koti_nrf_time time;
+		uint64_t *u64;
 	};
-};
-
-/* one way packet structure with embedded uuid */
-struct koti_nrf_pck_broadcast_uuid {
-	struct koti_nrf_header hdr;
-	/* payload */
-	union {
-		/* as bytes */
-		uint8_t data[16];
-		/* 16-bit unsigned ints */
-		uint16_t u16[8];
-		/* 32-bit unsigned ints */
-		uint32_t u32[4];
-		/* floats */
-		float f32[4];
-		/* 64-bit unsigned ints */
-		uint64_t u64[2];
-	};
-	/* uuid */
-	uint8_t uuid_short[8];
 };
 
 /* IMPORTANT */
@@ -172,8 +95,8 @@ void nrf24l01p_koti_quit(void);
 
 void nrf24l01p_koti_set_key(uint8_t *key, uint8_t size);
 
-int8_t nrf24l01p_koti_recv(void *pck);
-int8_t nrf24l01p_koti_send(uint8_t to, uint8_t from, void *pck);
+int8_t nrf24l01p_koti_recv(struct koti_nrf_pck *pck);
+int8_t nrf24l01p_koti_send(struct koti_nrf_pck *pck);
 
 #ifdef __cplusplus
 }

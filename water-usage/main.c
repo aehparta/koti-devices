@@ -19,13 +19,15 @@
 #define HALL_PIN_READ GPIOC7
 
 #define TIMER_HZ 20
-#define HALL_PULSES_CNT (65536 - 60) /* pulses per litre */
+#define HALL_PULSES_CNT (65536 - 60) /* pulses per desilitre */
 #define HALL_WAIT 2                  /* seconds */
 
-#define SEND_DELAY 10
+#define SEND_DELAY 5
 
 struct spi_master master;
-#ifdef USE_BLE
+#ifndef USE_BLE
+static const uint8_t mac[6] = {0x17, 0, 0, 0, 0, 1};
+#else
 struct nrf24l01p_ble_device nrf_ble;
 uint8_t mac[6] = {0x17, 0x17, 'B', 'E', 'B', 'T'};
 #endif
@@ -128,14 +130,14 @@ void main(void)
 	p_init();
 
 #ifndef USE_BLE
-	struct koti_nrf_pck_broadcast_uuid pck;
-	memset(pck.data, 0, sizeof(pck.data));
-	memcpy(pck.uuid, "123456789abcdef", 16);
+	struct koti_nrf_pck pck;
+	memset(&pck, 0, sizeof(pck));
+	memcpy(pck.hdr.mac, mac, sizeof(mac));
 #else
 	uint8_t buf[18];
 #endif
 
-	uint32_t litres = 0;
+	uint64_t millilitres = 0;
 	uint16_t send_timer = SEND_DELAY * TIMER_HZ;
 	uint8_t hall_delay = 0;
 	uint8_t hall_last = HALL_PULSES_CNT & 0xff;
@@ -158,7 +160,7 @@ void main(void)
 			TMR1IF = 0;
 			TMR1H = HALL_PULSES_CNT >> 8;
 			TMR1L = HALL_PULSES_CNT & 0xff;
-			litres++;
+			millilitres += 100;
 		}
 
 		if (TMR0IF) {
@@ -213,11 +215,12 @@ void main(void)
 
 				/* send data */
 #ifndef USE_BLE
-				pck.hdr.flags = 0;
-				pck.hdr.type = 0;
+				pck.hdr.flags = KOTI_NRF_FLAG_ENC_2_BLOCKS;
+				pck.hdr.type = KOTI_NRF_TYPE_WATER_FLOW_MILLILITRE;
 				pck.hdr.bat = (uint8_t)vbat;
-				pck.u32 = litres;
-				nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
+				memset(pck.data, 0, sizeof(pck.data));
+				memcpy(pck.data, &millilitres, sizeof(millilitres));
+				nrf24l01p_koti_send(&pck);
 #else
 				buf[0] = 4;
 				buf[1] = 0x16;
@@ -229,10 +232,10 @@ void main(void)
 				buf[6] = 0x16;
 				buf[7] = 0x67;
 				buf[8] = 0x27;
-				buf[9] = (litres >> 24) & 0xff;
-				buf[10] = (litres >> 16) & 0xff;
-				buf[11] = (litres >> 8) & 0xff;
-				buf[12] = litres & 0xff;
+				buf[9] = (millilitres >> 24) & 0xff;
+				buf[10] = (millilitres >> 16) & 0xff;
+				buf[11] = (millilitres >> 8) & 0xff;
+				buf[12] = millilitres & 0xff;
 
 				for (uint8_t i = 0; i < 3; i++) {
 					nrf24l01p_ble_advertise(&nrf_ble, buf, 13);

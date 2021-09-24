@@ -3,7 +3,6 @@
  */
 
 #include <koti.h>
-#include "device-uuid.h"
 
 #pragma config FEXTOSC = OFF
 #pragma config WDTE = OFF
@@ -15,7 +14,7 @@
 #define BTN2 GPIOC5
 
 static struct spi_master master;
-static const uint8_t uuid[] = UUID_ARRAY;
+static const uint8_t mac[6] = {0x17, 1, 2, 3, 4, 5};
 
 void p_init(void)
 {
@@ -89,12 +88,12 @@ void p_init(void)
 
 void main(void)
 {
-	/* init */
+	struct koti_nrf_pck pck;
+
 	p_init();
 
-	struct koti_nrf_pck_broadcast_uuid pck;
 	memset(&pck, 0, sizeof(pck));
-	memcpy(pck.uuid_short, uuid + 8, sizeof(pck.uuid_short));
+	memcpy(pck.hdr.mac, mac, sizeof(mac));
 
 	while (1) {
 		SLEEP();
@@ -103,14 +102,20 @@ void main(void)
 		/* read buttons */
 		uint8_t btn1 = gpio_read(BTN1);
 		uint8_t btn2 = gpio_read(BTN2);
+		if (!btn1) {
+			pck.data[0] = 0;
+		} else if (!btn2) {
+			pck.data[0] = 1;
+		} else {
+			/* this was a release */
+			continue;
+		}
 
 		/* send */
-		pck.hdr.flags = KOTI_NRF_ENC_BLOCKS_1;
+		pck.hdr.flags = KOTI_NRF_FLAG_ENC_1_BLOCK;
 		pck.hdr.bat = 0;
-		pck.hdr.type = KOTI_NRF_TYPE_BUTTONS;
+		pck.hdr.type = KOTI_NRF_TYPE_CLICK;
+		nrf24l01p_koti_send(&pck);
 		memset(pck.data, 0, sizeof(pck.data));
-		pck.data[0] = 2;
-		pck.data[1] = (btn1 ? 0 : 1) | (btn2 ? 0 : 2);
-		nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
 	}
 }

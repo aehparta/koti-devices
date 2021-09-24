@@ -1,43 +1,36 @@
 from pyRC5 import RC5
-
-ENC_RC5 = 0
-ENC_AES128 = 1
-ENC_AES128 = 2
-ENC_NONE = 3
-
-def decrypt_rc5(data, key):
-    data = bytearray(data)
-    # clear ttl
-    data[0] &= 0xfc
-    
-    enc_blocks = (data[0] & 0x30) >> 4
-
-    rc5 = RC5.RC5(32, 12, key)
-
-    if enc_blocks >= 3:
-        block = rc5.decryptBlock(data[24:32])
-        for i in range(8):
-            data[i + 24] = block[i] ^ data[i + 16]
-
-    if enc_blocks >= 2:
-        block = rc5.decryptBlock(data[16:24])
-        for i in range(8):
-            data[i + 16] = block[i] ^ data[i + 8]
-
-    if enc_blocks >= 1:
-        block = rc5.decryptBlock(data[8:16])
-        for i in range(8):
-            data[i + 8] = block[i] ^ data[i]
-
-    block = rc5.decryptBlock(data[2:10])
-    for i in range(8):
-        data[i + 2] = block[i]
-
-    return bytes(data)
+from crc import crc8_dallas
 
 def decrypt(data):
-    enc = (data[0] & 0xc0) >> 6
     key = b'12345678\0\0\0\0\0\0\0\0'
+    data = bytearray(data)
 
-    if enc == ENC_RC5:
-        return decrypt_rc5(data, key)
+    # decrypt if necessary
+    enc_blocks = (data[6] & 0x0c) >> 2
+    if enc_blocks:
+        rc5 = RC5.RC5(32, 12, key)
+        # third block
+        if enc_blocks >= 3:
+            block = rc5.decryptBlock(data[24:32])
+            for i in range(8):
+                data[i + 24] = block[i] ^ data[i + 16]
+        # second block
+        if enc_blocks >= 2:
+            block = rc5.decryptBlock(data[16:24])
+            for i in range(8):
+                data[i + 16] = block[i] ^ data[i + 8]
+        # first block
+        if enc_blocks >= 1:
+            block = rc5.decryptBlock(data[8:16])
+            for i in range(8):
+                data[i + 8] = block[i]
+
+    # calculate dallas-style 8-bit crc
+    crc_in = data[8] ^ data[7]
+    data[8] = data[7]
+    crc = crc8_dallas(data[8:32])
+    if crc != crc_in:
+        # print('crc mismatch, in:', crc_in, ', calculated:', crc)
+        return None
+
+    return bytes(data)

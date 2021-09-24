@@ -16,7 +16,9 @@ sdkconfig*
 *PIC8.sym
 *PIC8.hex
 *PIC8.s
+MPLABXLog.*
+log.[0-9]
 __pycache__/
 device-uuid.h
 device-uuid.txt
-
+build/

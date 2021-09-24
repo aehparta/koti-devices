@@ -4,12 +4,11 @@
 
 #include <koti.h>
 #include "button.h"
-#include "device-uuid.h"
 
 static bool buttons[BUTTON_COUNT];
-static const uint8_t uuid[] = UUID_ARRAY;
+static const uint8_t mac[6] = {0, 1, 2, 3, 4, 5};
 
-static void button_send_states(void);
+static void button_send_state(uint8_t btn);
 
 int8_t button_init(void)
 {
@@ -25,54 +24,51 @@ uint8_t button_count(void)
 	return BUTTON_COUNT;
 }
 
-bool button_state(uint8_t sw)
+bool button_state(uint8_t btn)
 {
-	if (sw >= BUTTON_COUNT) {
+	if (btn >= BUTTON_COUNT) {
 		return false;
 	}
-	return buttons[sw];
+	return buttons[btn];
 }
 
-bool button_on(uint8_t sw)
+bool button_on(uint8_t btn)
 {
-	if (sw >= BUTTON_COUNT) {
+	if (btn >= BUTTON_COUNT) {
 		return false;
 	}
-	buttons[sw] = true;
-	button_send_states();
+	buttons[btn] = true;
+	button_send_state(btn);
 	return true;
 }
 
-bool button_off(uint8_t sw)
+bool button_off(uint8_t btn)
 {
-	if (sw >= BUTTON_COUNT) {
+	if (btn >= BUTTON_COUNT) {
 		return false;
 	}
-	buttons[sw] = false;
-	button_send_states();
+	buttons[btn] = false;
+	button_send_state(btn);
 	return false;
 }
 
-bool button_toggle(uint8_t sw)
+bool button_toggle(uint8_t btn)
 {
-	if (sw >= BUTTON_COUNT) {
+	if (btn >= BUTTON_COUNT) {
 		return false;
 	}
-	return buttons[sw] ? button_off(sw) : button_on(sw);
+	return buttons[btn] ? button_off(btn) : button_on(btn);
 }
 
-void button_send_states(void)
+void button_send_state(uint8_t btn)
 {
-	struct koti_nrf_pck_broadcast_uuid pck;
-	memcpy(pck.uuid_short, uuid + 8, 8);
+	struct koti_nrf_pck pck;
+	memcpy(pck.hdr.mac, mac, 6);
 
-	pck.hdr.flags = KOTI_NRF_ENC_BLOCKS_3;
+	pck.hdr.flags = KOTI_NRF_FLAG_ENC_1_BLOCK;
 	pck.hdr.bat = 0;
-	pck.hdr.type = KOTI_NRF_TYPE_BUTTONS;
+	pck.hdr.type = KOTI_NRF_TYPE_CLICK;
 	memset(pck.data, 0, sizeof(pck.data));
-	pck.data[0] = BUTTON_COUNT;
-	for (uint8_t i = 0; i < BUTTON_COUNT; i++) {
-		pck.data[1 + (i >> 3)] |= buttons[i] ? (1 << (i & 0x07)) : 0;
-	}
-	nrf24l01p_koti_send(KOTI_NRF_ID_BRIDGE, KOTI_NRF_ID_UUID, &pck);
+	pck.data[0] = btn;
+	nrf24l01p_koti_send(&pck);
 }
