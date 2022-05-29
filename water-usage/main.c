@@ -26,14 +26,8 @@
 #define SEND_DELAY 5
 
 struct spi_master master;
-#ifndef USE_BLE
 static const uint8_t uuid[] = UUID_ARRAY;
 struct koti_nrf_pck pck;
-#else
-struct nrf24l01p_ble_device nrf_ble;
-uint8_t mac[6] = {0x17, 0x17, 'B', 'E', 'B', 'T'};
-uint8_t buf[18];
-#endif
 
 void p_init(void)
 {
@@ -97,14 +91,8 @@ void p_init(void)
 	spi_master_open(&master, NULL, 0, 0, 0, 0);
 
 	/* nrf initialization, hardcoded pins so zeroes there */
-#ifndef USE_BLE
 	nrf24l01p_koti_init(&master, 0, 0);
 	nrf24l01p_koti_set_key((uint8_t *)"12345678", 8);
-#else
-	/* nrf ble initialization */
-	nrf24l01p_ble_open(&nrf_ble, &master, 0, 0, mac);
-	nrf24l01p_set_power_down(&nrf_ble.nrf, true);
-#endif
 
 	/* timer 0 setup */
 	TMR0L = 0;
@@ -209,7 +197,6 @@ void main(void)
 				FVRMD = 1;
 
 				/* send data */
-#ifndef USE_BLE
 				memset(&pck.hdr, 0, sizeof(pck.hdr));
 				pck.hdr.to = KOTI_NRF_ADDR_CTRL;
 				pck.hdr.from = KOTI_NRF_ADDR_BROADCAST;
@@ -218,27 +205,6 @@ void main(void)
 				memcpy(pck.data, &millilitres, sizeof(millilitres));
 				memcpy(pck.uuid, uuid, sizeof(uuid));
 				nrf24l01p_koti_send(&pck);
-#else
-				buf[0] = 4;
-				buf[1] = 0x16;
-				buf[2] = 0x0f;
-				buf[3] = 0x18;
-				buf[4] = (uint8_t)vbat;
-
-				buf[5] = 7;
-				buf[6] = 0x16;
-				buf[7] = 0x67;
-				buf[8] = 0x27;
-				buf[9] = (millilitres >> 24) & 0xff;
-				buf[10] = (millilitres >> 16) & 0xff;
-				buf[11] = (millilitres >> 8) & 0xff;
-				buf[12] = millilitres & 0xff;
-
-				for (uint8_t i = 0; i < 3; i++) {
-					nrf24l01p_ble_advertise(&nrf_ble, buf, 13);
-					nrf24l01p_ble_hop(&nrf_ble);
-				}
-#endif
 			}
 		}
 	}
