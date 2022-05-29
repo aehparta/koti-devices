@@ -93,28 +93,32 @@ int8_t nrf24l01p_koti_recv(struct koti_nrf_pck *pck)
 
 	/* check if should decrypt */
 	switch (pck->hdr.flags & KOTI_NRF_FLAG_ENC_BLOCKS_MASK) {
-	case KOTI_NRF_FLAG_ENC_3_BLOCKS:
-		/* third data block */
+	case KOTI_NRF_FLAG_ENC_RC5_4_BLOCKS:
+		/* fourth data block */
 		rc5_decrypt(&rc5, p8 + 24);
 		for (i = 16; i < 24; i++) {
 			p8[i + 8] ^= p8[i];
 		}
-	case KOTI_NRF_FLAG_ENC_2_BLOCKS:
-		/* second data block */
+	case KOTI_NRF_FLAG_ENC_RC5_3_BLOCKS:
+		/* third data block */
 		rc5_decrypt(&rc5, p8 + 16);
 		for (i = 8; i < 16; i++) {
 			p8[i + 8] ^= p8[i];
 		}
-	case KOTI_NRF_FLAG_ENC_1_BLOCK:
-		/* first data block */
+	case KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS:
+		/* second data block */
 		rc5_decrypt(&rc5, p8 + 8);
+	case KOTI_NRF_FLAG_ENC_RC5_1_BLOCK:
+		/* first data block */
+		rc5_decrypt(&rc5, p8 + 4);
 	}
 
 	/* calculate crc */
-	crc_in = pck->hdr.crc ^ pck->hdr.seq;
-	pck->hdr.crc = pck->hdr.seq;
-	if (crc8_dallas(p8 + 8, 4 + KOTI_NRF_SIZE_PAYLOAD) != crc_in) {
-		// DEBUG_MSG("crc missmatch");
+	crc_in = pck->hdr.crc;
+	pck->hdr.crc = 0;
+	pck->hdr.flags = pck->hdr.rand;
+	if (crc8_dallas(p8, KOTI_NRF_SIZE) != crc_in) {
+		DEBUG_MSG("crc missmatch");
 		return 0;
 	}
 
@@ -124,47 +128,52 @@ int8_t nrf24l01p_koti_recv(struct koti_nrf_pck *pck)
 int8_t nrf24l01p_koti_send(struct koti_nrf_pck *pck)
 {
 	uint8_t *p8 = (uint8_t *)pck;
-	uint8_t i, enc;
+	uint8_t i, enc, flags;
 
-	/* get encryption level */
-	enc = pck->hdr.flags & KOTI_NRF_FLAG_ENC_BLOCKS_MASK;
-
-	/* set max ttl for now */
-	pck->hdr.flags |= KOTI_NRF_FLAG_TTL_MASK;
+	/* save flags temporarily and set max ttl for now */
+	flags = pck->hdr.flags | KOTI_NRF_FLAG_TTL_MASK;
 
 	/* set sequence number and increase it */
 	pck->hdr.seq = sequence++;
 	/* NOTE: this is a compatibility hack to make old Kotivo system to route these packets */
-	if (enc < KOTI_NRF_FLAG_ENC_3_BLOCKS) {
-		p8[31] = sequence;
-	}
+	// if (enc < KOTI_NRF_FLAG_ENC_3_BLOCKS) {
+	// 	p8[31] = sequence;
+	// }
 
 	/* make encrypted data more random  */
 	pck->hdr.rand = (uint8_t)rand();
-
-	/* use sequence to randomize encrypted data more (kind of iv replacement) */
-	pck->hdr.crc = pck->hdr.seq;
+	pck->hdr.reserved_rand = (uint8_t)rand();
+	pck->hdr.flags = pck->hdr.rand;
 	/* calculate crc */
-	pck->hdr.crc ^= crc8_dallas(p8 + 8, 4 + KOTI_NRF_SIZE_PAYLOAD);
+	pck->hdr.crc = 0;
+	pck->hdr.crc = crc8_dallas(p8, KOTI_NRF_SIZE);
 
-	/* check if should encrypt */
-	if (enc >= KOTI_NRF_FLAG_ENC_1_BLOCK) {
-		rc5_encrypt(&rc5, p8 + 8);
+	/* check if packet should be encrypted */
+	enc = pck->hdr.flags & KOTI_NRF_FLAG_ENC_BLOCKS_MASK;
+	if (enc >= KOTI_NRF_FLAG_ENC_RC5_1_BLOCK) {
+		rc5_encrypt(&rc5, p8 + 4);
 		/* second data block */
-		if (enc >= KOTI_NRF_FLAG_ENC_2_BLOCKS) {
-			for (i = 8; i < 16; i++) {
-				p8[i + 8] ^= p8[i];
-			}
-			rc5_encrypt(&rc5, p8 + 16);
+		if (enc >= KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS) {
+			rc5_encrypt(&rc5, p8 + 8);
 			/* third data block */
-			if (enc >= KOTI_NRF_FLAG_ENC_3_BLOCKS) {
-				for (i = 16; i < 24; i++) {
+			if (enc >= KOTI_NRF_FLAG_ENC_RC5_3_BLOCKS) {
+				for (i = 8; i < 16; i++) {
 					p8[i + 8] ^= p8[i];
 				}
-				rc5_encrypt(&rc5, p8 + 24);
+				rc5_encrypt(&rc5, p8 + 16);
+				/* fourth data block */
+				if (enc >= KOTI_NRF_FLAG_ENC_RC5_4_BLOCKS) {
+					for (i = 16; i < 24; i++) {
+						p8[i + 8] ^= p8[i];
+					}
+					rc5_encrypt(&rc5, p8 + 24);
+				}
 			}
 		}
 	}
+
+	/* resume original flags */
+	pck->hdr.flags = flags;
 
 #ifdef USE_DRIVER_NRF24L01P
 #ifdef USE_KOTI_NRF_LOW_POWER

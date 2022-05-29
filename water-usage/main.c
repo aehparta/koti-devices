@@ -3,6 +3,7 @@
  */
 
 #include <koti.h>
+#include "device-uuid.h"
 
 #if defined(MCU_PIC16LF18345)
 #pragma config DEBUG = OFF
@@ -26,10 +27,12 @@
 
 struct spi_master master;
 #ifndef USE_BLE
-static const uint8_t mac[6] = {0x17, 0, 0, 0, 0, 1};
+static const uint8_t uuid[] = UUID_ARRAY;
+struct koti_nrf_pck pck;
 #else
 struct nrf24l01p_ble_device nrf_ble;
 uint8_t mac[6] = {0x17, 0x17, 'B', 'E', 'B', 'T'};
+uint8_t buf[18];
 #endif
 
 void p_init(void)
@@ -129,14 +132,6 @@ void main(void)
 	/* init */
 	p_init();
 
-#ifndef USE_BLE
-	struct koti_nrf_pck pck;
-	memset(&pck, 0, sizeof(pck));
-	memcpy(pck.hdr.mac, mac, sizeof(mac));
-#else
-	uint8_t buf[18];
-#endif
-
 	uint64_t millilitres = 0;
 	uint16_t send_timer = SEND_DELAY * TIMER_HZ;
 	uint8_t hall_delay = 0;
@@ -215,11 +210,13 @@ void main(void)
 
 				/* send data */
 #ifndef USE_BLE
-				pck.hdr.flags = KOTI_NRF_FLAG_ENC_2_BLOCKS;
+				memset(&pck, 0, sizeof(pck));
+				pck.hdr.to = KOTI_NRF_ADDR_CTRL;
+				pck.hdr.from = KOTI_NRF_ADDR_BROADCAST;
+				pck.hdr.flags = KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS;
 				pck.hdr.type = KOTI_NRF_TYPE_WATER_FLOW_MILLILITRE;
-				pck.hdr.bat = (uint8_t)vbat;
-				memset(pck.data, 0, sizeof(pck.data));
 				memcpy(pck.data, &millilitres, sizeof(millilitres));
+				memcpy(pck.uuid, uuid, sizeof(uuid));
 				nrf24l01p_koti_send(&pck);
 #else
 				buf[0] = 4;
