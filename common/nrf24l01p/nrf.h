@@ -77,13 +77,13 @@ struct koti_nrf_pck {
 		/* as bytes */
 		uint8_t data[KOTI_NRF_SIZE_PAYLOAD];
 		/* 16-bit unsigned ints */
-		uint16_t *u16;
+		uint16_t u16[10];
 		/* 32-bit unsigned ints */
-		uint32_t *u32;
+		uint32_t u32[5];
 		/* floats */
-		float *f32;
+		float f32[5];
 		/* 64-bit unsigned ints */
-		uint64_t *u64;
+		uint64_t u64[2];
 	};
 };
 

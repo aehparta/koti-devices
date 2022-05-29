@@ -7,7 +7,7 @@
 
 /* command line options */
 struct opt_option opt_all[] = {
-    {'h', "help", no_argument, 0, NULL, NULL, "display this help and exit", {0}},
+    {0, "help", no_argument, 0, NULL, NULL, "display this help and exit", {0}},
 
     /* mqtt server */
     {'H', "mqtt-host", required_argument, 0, "localhost", NULL, "mqtt server hostname", {0}},
@@ -21,7 +21,7 @@ struct spi_master master;
 
 int p_init(int argc, char *argv[])
 {
-	/* very low level platform initialization */
+	/* low level platform initialization */
 	os_init();
 	/* debug/log init */
 	log_init();

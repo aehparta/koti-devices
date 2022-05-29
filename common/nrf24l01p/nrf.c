@@ -89,7 +89,7 @@ int8_t nrf24l01p_koti_recv(struct koti_nrf_pck *pck)
 		return n;
 	}
 
-	HEX_DUMP(pck, sizeof(*pck), 1);
+	// HEX_DUMP(pck, sizeof(*pck), 1);
 
 	/* check if should decrypt */
 	switch (pck->hdr.flags & KOTI_NRF_FLAG_ENC_BLOCKS_MASK) {
@@ -114,7 +114,7 @@ int8_t nrf24l01p_koti_recv(struct koti_nrf_pck *pck)
 	crc_in = pck->hdr.crc ^ pck->hdr.seq;
 	pck->hdr.crc = pck->hdr.seq;
 	if (crc8_dallas(p8 + 8, 4 + KOTI_NRF_SIZE_PAYLOAD) != crc_in) {
-		DEBUG_MSG("crc missmatch");
+		// DEBUG_MSG("crc missmatch");
 		return 0;
 	}
 
