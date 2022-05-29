@@ -210,7 +210,7 @@ void main(void)
 
 				/* send data */
 #ifndef USE_BLE
-				memset(&pck, 0, sizeof(pck));
+				memset(&pck.hdr, 0, sizeof(pck.hdr));
 				pck.hdr.to = KOTI_NRF_ADDR_CTRL;
 				pck.hdr.from = KOTI_NRF_ADDR_BROADCAST;
 				pck.hdr.flags = KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS;
