@@ -24,29 +24,32 @@ extern "C" {
 #define KOTI_NRF_ADDR_CTRL 0x00
 #define KOTI_NRF_ADDR_BROADCAST 0xff
 
+/* id query */
+#define KOTI_NRF_TYPE_ID_QUERY 1
+
 /* battery percentage */
-#define KOTI_NRF_TYPE_BATTERY 0
+#define KOTI_NRF_TYPE_BATTERY 2
 
 /* water flow in litres, 4 bytes:
  *  4 bytes: water flow, uint32_t
  */
-#define KOTI_NRF_TYPE_WATER_FLOW_LITRE 1
+#define KOTI_NRF_TYPE_WATER_FLOW_LITRE 3
 
 /* water flow in millilitres, 8 bytes:
  *  8 bytes: water flow, uint64_t
  */
-#define KOTI_NRF_TYPE_WATER_FLOW_MILLILITRE 2
+#define KOTI_NRF_TYPE_WATER_FLOW_MILLILITRE 4
 
 /* temperature and humidity, 8 bytes:
  *  4 bytes: temperature, float
  *  4 bytes: humidity, float
  */
-#define KOTI_NRF_TYPE_TH 3
+#define KOTI_NRF_TYPE_TH 5
 
 /* simple click, 1 byte:
  *  1 byte: id of clicked entity (button etc)
  */
-#define KOTI_NRF_TYPE_CLICK 4
+#define KOTI_NRF_TYPE_CLICK 6
 
 /* nrf packet flags */
 #define KOTI_NRF_FLAG_TTL_MASK 0x03
