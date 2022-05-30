@@ -52,7 +52,7 @@ extern "C" {
 
 
 /******************************************************************************/
-#define KOTI_BROADCAST_PORT 17117
+#define KOTI_BROADCAST_PORT 21579
 
 #ifdef TARGET_LINUX
 #include "opt.h"

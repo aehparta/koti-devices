@@ -111,27 +111,45 @@ void p_init(void)
 
 	/* full sleep mode */
 	IDLEN = 0;
-
-	/* initialize spi master, hardcoded pins etc so zeroes there */
-	spi_master_open(&spi, NULL, 0, 0, 0, 0);
 #endif
 
-	/* nrf initialization, hardcoded pins so zeroes there */
-	nrf24l01p_koti_init(&spi, 0, 0);
+#ifdef USE_FTDI
+	/* open ft232h type device and try to see if it has a nrf24l01+
+	 * connected to it through mpsse-spi
+	 */
+	if (!os_ftdi_use(OS_FTDI_GPIO_0_TO_63, 0, 0, NULL, NULL)) {
+		os_ftdi_set_mpsse(SPI_SCLK);
+	} else {
+		WARN_MSG("unable to open ftdi device for gpio 0-63");
+	}
+#endif
+
+	/* initialize spi master */
+	WARN_IF(spi_master_open(&spi,
+	                         SPI_CONTEXT,
+	                         SPI_FREQUENCY,
+	                         SPI_MISO,
+	                         SPI_MOSI,
+	                         SPI_SCLK),
+	         "unable to open spi master");
+
+	/* nrf initialization */
+	nrf24l01p_koti_init(&spi, NRF_SS, NRF_CE);
 	nrf24l01p_koti_set_key((uint8_t *)KEY_STRING, sizeof(KEY_STRING) - 1);
 
 	/* open i2c */
-	i2c_master_open(&i2c, NULL, 0, 0, 0);
+	// i2c_master_open(&i2c, NULL, 0, 0, 0);
 	/* try to find a temperature and humidity chip */
-	for (driver_index = 0; drivers[driver_index].open; driver_index++) {
-		if (!drivers[driver_index].open(&dev, &i2c, 0, 0)) {
-			break;
-		}
-	}
+	// for (driver_index = 0; drivers[driver_index].open; driver_index++) {
+	// 	if (!drivers[driver_index].open(&dev, &i2c, 0, 0)) {
+	// 		break;
+	// 	}
+	// }
 }
 
 void send_th(void)
 {
+	DEBUG_MSG("send");
 	memset(&pck, 0, sizeof(pck) - sizeof(uuid));
 	pck.hdr.src = KOTI_NRF_ADDR_BROADCAST;
 	pck.hdr.dst = KOTI_NRF_ADDR_CTRL;
