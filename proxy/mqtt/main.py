@@ -13,10 +13,10 @@ mqtt = MQTT()
 s = socket(AF_INET, SOCK_DGRAM)
 s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-s.bind(('', 17117))
+s.bind(('', 21579))
 
 
-def parse_header(packet: bytes) -> tuple[bool, UUID, bytes]:
+def parse_header(packet: bytes):
     src = packet[KOTI_NRF_PCK_HDR_SRC]
     dst = packet[KOTI_NRF_PCK_HDR_DST]
     uuid = UUID(int=0)

@@ -3,7 +3,7 @@ from crc import crc8_dallas
 from constants import *
 
 
-def decrypt(key: bytes, data: bytes) -> tuple[bool, bytes, bytes]:
+def decrypt(key: bytes, data: bytes):
     key = key.ljust(16, b'\0')
     data = bytearray(data)
 
