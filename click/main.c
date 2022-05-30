@@ -14,23 +14,17 @@
 #pragma config BOREN = OFF
 #pragma config LPBOREN = OFF
 #pragma config CSWEN = ON
+
+#define CLICK_PIN_EN GPIOB7
+#define CLICK_PIN_EN_BIT LATBbits.LATB7
+#define CLICK_PIN_READ GPIOC7
 #endif
 
-#define HALL_PIN_EN GPIOB7
-#define HALL_PIN_EN_BIT LATBbits.LATB7
-#define HALL_PIN_READ GPIOC7
-
-#define TIMER_HZ 20
-#define HALL_PULSES_CNT (65536 - 60) /* pulses per desilitre */
-#define HALL_WAIT 2                  /* seconds */
-
-#define SEND_DELAY 20
 #define SEND_DELAY_BATTERY 600
 
 struct spi_master master;
 static const uint8_t uuid[] = UUID_ARRAY;
 struct koti_nrf_pck pck;
-uint64_t millilitres = 0;
 
 
 void p_init(void)
@@ -87,25 +81,20 @@ void p_init(void)
 	TMR0MD = 0;
 	TMR1MD = 0;
 
-	/* hall sensor */
-	gpio_input(HALL_PIN_READ);
-	gpio_output(HALL_PIN_EN);
-	gpio_high(HALL_PIN_EN);
-
 	/* timer 0 setup */
 	TMR0L = 0;
-	TMR0H = 31000 / TIMER_HZ / 16;
+	TMR0H = 31000 / 16;
 	T0CON1 = 0x94; /* LFINTOSC and async, 1:16 prescaler */
 	TMR0IE = 1;
 	T0CON0 = 0x80; /* enable timer as 8-bit, no postscaler */
 
 	/* timer 1 setup */
-	TMR1H = HALL_PULSES_CNT >> 8;
-	TMR1L = HALL_PULSES_CNT & 0xff;
+	TMR1H = 0;
+	TMR1L = 0;
 	T1GCON = 0x00;
 	TMR1GATE = 0;
 	TMR1CLK = 0;
-	T1CKIPPS = HALL_PIN_READ;
+	T1CKIPPS = COUNT_PIN_READ;
 	TMR1IE = 1;
 	T1CON = 0x07;
 
@@ -121,14 +110,13 @@ void p_init(void)
 	nrf24l01p_koti_set_key((uint8_t *)KEY_STRING, sizeof(KEY_STRING) - 1);
 }
 
-void send_usage(void)
+void send_click(void)
 {
 	memset(&pck, 0, sizeof(pck) - sizeof(uuid));
 	pck.hdr.src = KOTI_NRF_ADDR_BROADCAST;
 	pck.hdr.dst = KOTI_NRF_ADDR_CTRL;
 	pck.hdr.flags = KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS;
-	pck.hdr.type = KOTI_TYPE_WATER_FLOW_MILLILITRE;
-	memcpy(pck.data, &millilitres, sizeof(millilitres));
+	pck.hdr.type = KOTI_TYPE_CLICK;
 	memcpy(pck.uuid, uuid, sizeof(uuid));
 	nrf24l01p_koti_send(&pck);
 }
@@ -154,50 +142,22 @@ int main(void)
 	p_init();
 
 #ifdef TARGET_PIC8
-	uint16_t send_timer = SEND_DELAY * TIMER_HZ;
-	uint16_t send_timer_battery = SEND_DELAY_BATTERY * TIMER_HZ + 1;
-	uint8_t hall_delay = 0;
-	uint8_t hall_last = HALL_PULSES_CNT & 0xff;
+	uint16_t send_timer_battery = SEND_DELAY_BATTERY;
 
 	while (1) {
 		SYSCMD = 1;
 		SLEEP();
-		HALL_PIN_EN_BIT = 0;
 		SYSCMD = 0;
-
-		if (hall_last != TMR1L) {
-			hall_last = TMR1L;
-			hall_delay = HALL_WAIT * TIMER_HZ;
-		} else if (hall_delay == 0) {
-			HALL_PIN_EN_BIT = 1;
-		}
-
-		if (TMR1IF) {
-			TMR1IF = 0;
-			TMR1H = HALL_PULSES_CNT >> 8;
-			TMR1L = HALL_PULSES_CNT & 0xff;
-			millilitres += 100;
-		}
 
 		if (TMR0IF) {
 			TMR0IF = 0;
 
-			if (hall_delay) {
-				hall_delay--;
-			}
-
-			send_timer--;
 			send_timer_battery--;
-
-			if (send_timer == 0) {
-				send_timer = SEND_DELAY * TIMER_HZ;
-				send_usage();
-			}
 
 			if (send_timer_battery == 0) {
 				uint8_t percentage = 0;
 
-				send_timer_battery = SEND_DELAY_BATTERY * TIMER_HZ;
+				send_timer_battery = SEND_DELAY_BATTERY;
 
 				/* enable adc/fvr */
 				FVRMD = 0;
@@ -238,9 +198,8 @@ int main(void)
 	}
 #else
 	while (1) {
-		send_usage();
+		send_click();
 		send_battery(75, KOTI_PSU_BATTERY_LITHIUM, 1, 2.5);
-		millilitres += 1;
 		os_delay_ms(1000);
 	}
 #endif

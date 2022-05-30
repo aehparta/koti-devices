@@ -24,33 +24,6 @@ extern "C" {
 #define KOTI_NRF_ADDR_CTRL 0x00
 #define KOTI_NRF_ADDR_BROADCAST 0xff
 
-/* id query */
-#define KOTI_NRF_TYPE_ID_QUERY 1
-
-/* battery percentage */
-#define KOTI_NRF_TYPE_BATTERY 2
-
-/* water flow in litres, 4 bytes:
- *  4 bytes: water flow, uint32_t
- */
-#define KOTI_NRF_TYPE_WATER_FLOW_LITRE 3
-
-/* water flow in millilitres, 8 bytes:
- *  8 bytes: water flow, uint64_t
- */
-#define KOTI_NRF_TYPE_WATER_FLOW_MILLILITRE 4
-
-/* temperature and humidity, 8 bytes:
- *  4 bytes: temperature, float
- *  4 bytes: humidity, float
- */
-#define KOTI_NRF_TYPE_TH 5
-
-/* simple click, 1 byte:
- *  1 byte: id of clicked entity (button etc)
- */
-#define KOTI_NRF_TYPE_CLICK 6
-
 /* nrf packet flags */
 #define KOTI_NRF_FLAG_TTL_MASK 0x03
 #define KOTI_NRF_FLAG_ENC_BLOCKS_MASK 0xe0
@@ -65,8 +38,8 @@ extern "C" {
 
 /* basic header structure */
 struct koti_nrf_header {
-	uint8_t to;   /* to address */
-	uint8_t from; /* from address */
+	uint8_t src; /* from address */
+	uint8_t dst; /* to address */
 	/* flag bits:
 	 *  0-1: ttl, 2 bits
 	 *  5-7: 8-byte blocks of encrypted parts
@@ -102,13 +75,23 @@ struct koti_nrf_pck {
 			uint8_t uuid_padding[8];
 			uint8_t uuid[16];
 		};
+
+		/* power supply */
+		struct {
+			uint8_t percentage;
+			uint8_t type;
+			uint8_t cells;
+			uint8_t reserved;
+			float voltage;
+		} psu;
 	};
 };
 
 /* IMPORTANT */
 #pragma pack()
 
-int8_t nrf24l01p_koti_init(struct spi_master *master, uint8_t ss, uint8_t ce);
+int8_t
+nrf24l01p_koti_init(struct spi_master *master, uint8_t ss, uint8_t ce);
 void nrf24l01p_koti_quit(void);
 
 void nrf24l01p_koti_set_key(uint8_t *key, uint8_t size);

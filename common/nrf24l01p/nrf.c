@@ -143,17 +143,23 @@ int8_t nrf24l01p_koti_send(struct koti_nrf_pck *pck)
 	/* make encrypted data more random  */
 	pck->hdr.rand = (uint8_t)rand();
 	pck->hdr.reserved_rand = (uint8_t)rand();
-	pck->hdr.flags = pck->hdr.rand;
 	/* calculate crc */
+	pck->hdr.flags = 0;
 	pck->hdr.crc = 0;
 	pck->hdr.crc = crc8_dallas(p8, KOTI_NRF_SIZE);
 
 	/* check if packet should be encrypted */
-	enc = pck->hdr.flags & KOTI_NRF_FLAG_ENC_BLOCKS_MASK;
+	enc = flags & KOTI_NRF_FLAG_ENC_BLOCKS_MASK;
 	if (enc >= KOTI_NRF_FLAG_ENC_RC5_1_BLOCK) {
+		for (i = 0; i < 4; i++) {
+			p8[i + 4] ^= p8[i];
+		}
 		rc5_encrypt(&rc5, p8 + 4);
 		/* second data block */
 		if (enc >= KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS) {
+			for (i = 0; i < 8; i++) {
+				p8[i + 8] ^= p8[i];
+			}
 			rc5_encrypt(&rc5, p8 + 8);
 			/* third data block */
 			if (enc >= KOTI_NRF_FLAG_ENC_RC5_3_BLOCKS) {

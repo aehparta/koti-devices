@@ -3,8 +3,12 @@ mqtt:
   port: 1883
   username:
   password:
-  prefix: koti/
+  prefix: testing/
 
 devices:
-  '0x170000000001':
-    key: '12345678'
+  # water usage
+  a26f6e82-e006-11ec-9aaf-87d30db676d1:
+    key: 085ce5c8d31cb6e6
+  # click
+  d7d80618-e030-11ec-83a4-631c4abd3eb2:
+    key: fb9239d72670dd63

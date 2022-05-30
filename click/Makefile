@@ -17,9 +17,9 @@ USE_X86 += LOG LOG_COLORS BROADCAST
 include $(KOTI_PATH)/init.mk
 
 # our own sources etc
-BUILD_BINS = wu
-PROGRAM_BIN = wu
-wu_SRC = main.c $(libe_SRC) $(koti_nrf_SRC)
+BUILD_BINS = click
+PROGRAM_BIN = click
+click_SRC = main.c $(libe_SRC) $(koti_nrf_SRC)
 
 # build
 include $(KOTI_PATH)/build.mk
