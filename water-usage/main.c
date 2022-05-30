@@ -196,8 +196,9 @@ int main(void)
 
 			if (send_timer_battery == 0) {
 				uint8_t percentage = 0;
+				float voltage = (2048.0 * 2048.0 * 16.0) / 1000.0;
 
-				send_timer_battery = SEND_DELAY_BATTERY * TIMER_HZ;
+				send_timer_battery = SEND_DELAY_BATTERY;
 
 				/* enable adc/fvr */
 				FVRMD = 0;
@@ -227,12 +228,13 @@ int main(void)
 					percentage = 137 - (ADRESH);
 					percentage = percentage < 50 ? percentage * 2 : 100;
 				}
+				voltage /= (float)ADRES;
 
 				/* disable adc/fvr */
 				ADCMD = 1;
 				FVRMD = 1;
 
-				send_battery(percentage, KOTI_PSU_BATTERY_LITHIUM, 0, 0);
+				send_battery(percentage, KOTI_PSU_BATTERY_LITHIUM, 1, voltage);
 			}
 		}
 	}

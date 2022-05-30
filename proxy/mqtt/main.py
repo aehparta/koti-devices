@@ -51,7 +51,7 @@ while True:
 
     type = header[KOTI_NRF_PCK_HDR_TYPE]
 
-    # battery
+    # power supply
     if type == KOTI_TYPE_PSU:
         (percentage, type, cells, voltage) = struct.unpack_from('<BBBxf', data, 0)
         if percentage <= 100:

@@ -14,17 +14,39 @@
 #pragma config BOREN = OFF
 #pragma config LPBOREN = OFF
 #pragma config CSWEN = ON
-
-#define CLICK_PIN_EN GPIOB7
-#define CLICK_PIN_EN_BIT LATBbits.LATB7
-#define CLICK_PIN_READ GPIOC7
 #endif
 
+#define SEND_DELAY 1
 #define SEND_DELAY_BATTERY 600
 
-struct spi_master master;
+#ifndef I2C_CONTEXT
+#define I2C_CONTEXT NULL
+#define I2C_SCL 0
+#define I2C_SDA 0
+#endif
+
+struct spi_master spi;
 static const uint8_t uuid[] = UUID_ARRAY;
 struct koti_nrf_pck pck;
+struct i2c_master i2c;
+struct i2c_device dev;
+uint8_t driver_index = 0;
+float temperature = 0.0;
+float humidity = 0.0;
+
+struct driver {
+	char *name;
+	int8_t (*open)(struct i2c_device *dev, struct i2c_master *master, int32_t reference, int32_t resolution);
+	int8_t (*read)(struct i2c_device *dev, float *t, float *h);
+};
+
+struct driver drivers[] = {
+	/* this must be before sht21, they have same address and only hdc1080 can be detected */
+	{ "hdc1080", hdc1080_open, hdc1080_read },
+	{ "sht21", sht21_open, sht21_read },
+	{ "sht31", sht31_open, sht31_read },
+	{ NULL, NULL, NULL }
+};
 
 
 void p_init(void)
@@ -79,7 +101,6 @@ void p_init(void)
 	SYSCMD = 0;
 	MSSP1MD = 0;
 	TMR0MD = 0;
-	TMR1MD = 0;
 
 	/* timer 0 setup */
 	TMR0L = 0;
@@ -88,35 +109,36 @@ void p_init(void)
 	TMR0IE = 1;
 	T0CON0 = 0x80; /* enable timer as 8-bit, no postscaler */
 
-	/* timer 1 setup */
-	TMR1H = 0;
-	TMR1L = 0;
-	T1GCON = 0x00;
-	TMR1GATE = 0;
-	TMR1CLK = 0;
-	T1CKIPPS = COUNT_PIN_READ;
-	TMR1IE = 1;
-	T1CON = 0x07;
-
 	/* full sleep mode */
 	IDLEN = 0;
 
 	/* initialize spi master, hardcoded pins etc so zeroes there */
-	spi_master_open(&master, NULL, 0, 0, 0, 0);
+	spi_master_open(&spi, NULL, 0, 0, 0, 0);
 #endif
 
 	/* nrf initialization, hardcoded pins so zeroes there */
-	nrf24l01p_koti_init(&master, 0, 0);
+	nrf24l01p_koti_init(&spi, 0, 0);
 	nrf24l01p_koti_set_key((uint8_t *)KEY_STRING, sizeof(KEY_STRING) - 1);
+
+	/* open i2c */
+	i2c_master_open(&i2c, NULL, 0, 0, 0);
+	/* try to find a temperature and humidity chip */
+	for (driver_index = 0; drivers[driver_index].open; driver_index++) {
+		if (!drivers[driver_index].open(&dev, &i2c, 0, 0)) {
+			break;
+		}
+	}
 }
 
-void send_click(void)
+void send_th(void)
 {
 	memset(&pck, 0, sizeof(pck) - sizeof(uuid));
 	pck.hdr.src = KOTI_NRF_ADDR_BROADCAST;
 	pck.hdr.dst = KOTI_NRF_ADDR_CTRL;
 	pck.hdr.flags = KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS;
-	pck.hdr.type = KOTI_TYPE_CLICK;
+	pck.hdr.type = KOTI_TYPE_TH;
+	pck.f32[0] = temperature;
+	pck.f32[1] = humidity;
 	memcpy(pck.uuid, uuid, sizeof(uuid));
 	nrf24l01p_koti_send(&pck);
 }
@@ -142,6 +164,7 @@ int main(void)
 	p_init();
 
 #ifdef TARGET_PIC8
+	uint16_t send_timer = SEND_DELAY;
 	uint16_t send_timer_battery = SEND_DELAY_BATTERY;
 
 	while (1) {
@@ -152,7 +175,14 @@ int main(void)
 		if (TMR0IF) {
 			TMR0IF = 0;
 
+			send_timer--;
 			send_timer_battery--;
+
+			if (send_timer == 0) {
+				send_timer = SEND_DELAY;
+				drivers[driver_index].read(&dev, &temperature, &humidity);
+				send_th();
+			}
 
 			if (send_timer_battery == 0) {
 				uint8_t percentage = 0;
@@ -200,7 +230,9 @@ int main(void)
 	}
 #else
 	while (1) {
-		send_click();
+		temperature = rand() % 3000 / 100.0;
+		humidity = rand() % 100;
+		send_th();
 		send_battery(75, KOTI_PSU_BATTERY_LITHIUM, 1, 2.5);
 		os_delay_ms(1000);
 	}
