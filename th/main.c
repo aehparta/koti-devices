@@ -16,7 +16,7 @@
 #pragma config CSWEN = ON
 #endif
 
-#define SEND_DELAY 1
+#define SEND_DELAY 10
 #define SEND_DELAY_BATTERY 600
 
 #ifndef I2C_CONTEXT
@@ -126,30 +126,31 @@ void p_init(void)
 
 	/* initialize spi master */
 	WARN_IF(spi_master_open(&spi,
-	                         SPI_CONTEXT,
-	                         SPI_FREQUENCY,
-	                         SPI_MISO,
-	                         SPI_MOSI,
-	                         SPI_SCLK),
-	         "unable to open spi master");
+	                        SPI_CONTEXT,
+	                        SPI_FREQUENCY,
+	                        SPI_MISO,
+	                        SPI_MOSI,
+	                        SPI_SCLK),
+	        "unable to open spi master");
 
 	/* nrf initialization */
 	nrf24l01p_koti_init(&spi, NRF_SS, NRF_CE);
 	nrf24l01p_koti_set_key((uint8_t *)KEY_STRING, sizeof(KEY_STRING) - 1);
 
 	/* open i2c */
-	// i2c_master_open(&i2c, NULL, 0, 0, 0);
+	i2c_master_open(&i2c, NULL, 0, 0, 0);
 	/* try to find a temperature and humidity chip */
-	// for (driver_index = 0; drivers[driver_index].open; driver_index++) {
-	// 	if (!drivers[driver_index].open(&dev, &i2c, 0, 0)) {
-	// 		break;
-	// 	}
-	// }
+	for (driver_index = 0; drivers[driver_index].open; driver_index++) {
+		if (!drivers[driver_index].open(&dev, &i2c, 0, 0)) {
+			DEBUG_MSG("i2c t&h chip found: %s", drivers[driver_index].name);
+			break;
+		}
+	}
 }
 
 void send_th(void)
 {
-	DEBUG_MSG("send");
+	DEBUG_MSG("t&h send, t: %f, h: %f", temperature, humidity);
 	memset(&pck, 0, sizeof(pck) - sizeof(uuid));
 	pck.hdr.src = KOTI_NRF_ADDR_BROADCAST;
 	pck.hdr.dst = KOTI_NRF_ADDR_CTRL;
@@ -194,7 +195,7 @@ int main(void)
 			TMR0IF = 0;
 
 			send_timer--;
-			send_timer_battery--;
+			// send_timer_battery--;
 
 			if (send_timer == 0) {
 				send_timer = SEND_DELAY;

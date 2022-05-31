@@ -17,4 +17,4 @@ class MQTT:
 
     def publish(self, topic, message):
         self.client.publish(topic=self.prefix + topic,
-                            payload=message, qos=1, retain=True)
+                            payload=message, qos=1, retain=False)
