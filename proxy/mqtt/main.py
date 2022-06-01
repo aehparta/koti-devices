@@ -1,5 +1,6 @@
 import struct
 from socket import *
+import time
 from uuid import UUID
 
 import cfg
@@ -39,13 +40,15 @@ def parse_header(packet: bytes):
 
 while True:
     packet = s.recv(1024)
+    if len(packet) != 32:
+        continue
     (ok, uuid, key) = parse_header(packet)
-    print(ok, uuid, key)
     if not ok:
         continue
     (ok, header, data) = decrypt(key, packet)
     if not ok:
         continue
+    print(time.strftime('%H:%M:%S'), uuid, key, header.hex(','), data.hex(','))
 
     # print(packet.hex(' '))
 
@@ -56,7 +59,12 @@ while True:
         (percentage, type, cells, voltage) = struct.unpack_from('<BBBxf', data, 0)
         if percentage <= 100:
             mqtt.publish(f'sensor/{uuid}/psu/percentage', percentage)
-        mqtt.publish(f'sensor/{uuid}/psu/type', type)
+        type_str = 'UNKNOWN'
+        if type == KOTI_PSU_BATTERY_LITHIUM:
+            type_str = 'LITHIUM'
+        elif type == KOTI_PSU_BATTERY_ALKALINE:
+            type_str = 'ALKALINE'
+        mqtt.publish(f'sensor/{uuid}/psu/type', type_str)
         if cells > 0:
             mqtt.publish(f'sensor/{uuid}/psu/cells', cells)
         mqtt.publish(f'sensor/{uuid}/psu/voltage', voltage)
@@ -82,3 +90,7 @@ while True:
     if type == KOTI_TYPE_COUNT:
         (value,) = struct.unpack_from('<Q', data, 0)
         mqtt.publish(f'sensor/{uuid}/count/state', value)
+
+    # debug
+    if type == KOTI_TYPE_DEBUG:
+        mqtt.publish(f'sensor/{uuid}/debug', str(data))

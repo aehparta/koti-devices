@@ -20,14 +20,10 @@ extern "C" {
 /* power supply */
 #define KOTI_TYPE_PSU 2
 
-/* water flow in litres, 8 bytes:
- *  8 bytes: water flow, uint64_t
- */
+/* water flow in litres, 8 bytes, uint64_t */
 #define KOTI_TYPE_WATER_FLOW_LITRE 3
 
-/* water flow in millilitres, 8 bytes:
- *  8 bytes: water flow, uint64_t
- */
+/* water flow in millilitres, 8 bytes, uint64_t */
 #define KOTI_TYPE_WATER_FLOW_MILLILITRE 4
 
 /* temperature and humidity, 8 bytes:
@@ -38,6 +34,12 @@ extern "C" {
 
 /* extremely simple click, no data, just sent when click occurs */
 #define KOTI_TYPE_CLICK 6
+
+/* count, 8 bytes, uint64_t */
+#define KOTI_TYPE_COUNT 7
+
+/* debug data packet */
+#define KOTI_TYPE_DEBUG 255
 
 
 /******************************************************************************/

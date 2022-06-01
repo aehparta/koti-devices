@@ -6,7 +6,7 @@
 #include "device.h"
 
 #ifdef TARGET_PIC8
-#if defined(MCU_PIC16LF18345)
+#if defined(MCU_16LF18345)
 #pragma config DEBUG = OFF
 #endif
 #pragma config FEXTOSC = OFF
@@ -76,7 +76,7 @@ void p_init(void)
 	PMD3 = 0xff;
 	PMD4 = 0xff;
 	PMD5 = 0xff;
-#if defined(MCU_PIC16LF18446)
+#if defined(MCU_16LF18446)
 	PMD6 = 0xff;
 	PMD7 = 0xff;
 #endif

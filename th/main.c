@@ -1,12 +1,12 @@
 /*
- * Water usage sensor using PIC16LF18345.
+ *Temeprature and humidity sensor using PIC16LF18446 or similar.
  */
 
 #include <koti.h>
 #include "device.h"
 
 #ifdef TARGET_PIC8
-#if defined(MCU_PIC16LF18345)
+#if defined(MCU_16LF18345)
 #pragma config DEBUG = OFF
 #endif
 #pragma config FEXTOSC = OFF
@@ -17,7 +17,7 @@
 #endif
 
 #define SEND_DELAY 10
-#define SEND_DELAY_BATTERY 600
+#define SEND_DELAY_BATTERY 60
 
 #ifndef I2C_CONTEXT
 #define I2C_CONTEXT NULL
@@ -48,6 +48,47 @@ struct driver drivers[] = {
 	{ NULL, NULL, NULL }
 };
 
+
+void send_debug(char *data)
+{
+	memset(&pck, 0, sizeof(pck) - sizeof(uuid));
+	pck.hdr.src = KOTI_NRF_ADDR_BROADCAST;
+	pck.hdr.dst = KOTI_NRF_ADDR_CTRL;
+	pck.hdr.flags = KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS;
+	pck.hdr.type = KOTI_TYPE_DEBUG;
+	strncpy((char *)pck.data, data, 8);
+	memcpy(pck.uuid, uuid, sizeof(uuid));
+	nrf24l01p_koti_send(&pck);
+}
+
+void send_th(void)
+{
+	DEBUG_MSG("t&h send, t: %f, h: %f", temperature, humidity);
+	memset(&pck, 0, sizeof(pck) - sizeof(uuid));
+	pck.hdr.src = KOTI_NRF_ADDR_BROADCAST;
+	pck.hdr.dst = KOTI_NRF_ADDR_CTRL;
+	pck.hdr.flags = KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS;
+	pck.hdr.type = KOTI_TYPE_TH;
+	pck.f32[0] = temperature;
+	pck.f32[1] = humidity;
+	memcpy(pck.uuid, uuid, sizeof(uuid));
+	nrf24l01p_koti_send(&pck);
+}
+
+void send_battery(uint8_t percentage, uint8_t type, uint8_t cells, float voltage)
+{
+	memset(&pck, 0, sizeof(pck) - sizeof(uuid));
+	pck.hdr.src = KOTI_NRF_ADDR_BROADCAST;
+	pck.hdr.dst = KOTI_NRF_ADDR_CTRL;
+	pck.hdr.flags = KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS;
+	pck.hdr.type = KOTI_TYPE_PSU;
+	pck.psu.percentage = percentage;
+	pck.psu.type = type;
+	pck.psu.cells = cells;
+	pck.psu.voltage = voltage;
+	memcpy(pck.uuid, uuid, sizeof(uuid));
+	nrf24l01p_koti_send(&pck);
+}
 
 void p_init(void)
 {
@@ -92,7 +133,7 @@ void p_init(void)
 	PMD3 = 0xff;
 	PMD4 = 0xff;
 	PMD5 = 0xff;
-#if defined(MCU_PIC16LF18446)
+#if defined(MCU_16LF18446)
 	PMD6 = 0xff;
 	PMD7 = 0xff;
 #endif
@@ -143,38 +184,10 @@ void p_init(void)
 	for (driver_index = 0; drivers[driver_index].open; driver_index++) {
 		if (!drivers[driver_index].open(&dev, &i2c, 0, 0)) {
 			DEBUG_MSG("i2c t&h chip found: %s", drivers[driver_index].name);
+			send_debug(drivers[driver_index].name);
 			break;
 		}
 	}
-}
-
-void send_th(void)
-{
-	DEBUG_MSG("t&h send, t: %f, h: %f", temperature, humidity);
-	memset(&pck, 0, sizeof(pck) - sizeof(uuid));
-	pck.hdr.src = KOTI_NRF_ADDR_BROADCAST;
-	pck.hdr.dst = KOTI_NRF_ADDR_CTRL;
-	pck.hdr.flags = KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS;
-	pck.hdr.type = KOTI_TYPE_TH;
-	pck.f32[0] = temperature;
-	pck.f32[1] = humidity;
-	memcpy(pck.uuid, uuid, sizeof(uuid));
-	nrf24l01p_koti_send(&pck);
-}
-
-void send_battery(uint8_t percentage, uint8_t type, uint8_t cells, float voltage)
-{
-	memset(&pck, 0, sizeof(pck) - sizeof(uuid));
-	pck.hdr.src = KOTI_NRF_ADDR_BROADCAST;
-	pck.hdr.dst = KOTI_NRF_ADDR_CTRL;
-	pck.hdr.flags = KOTI_NRF_FLAG_ENC_RC5_2_BLOCKS;
-	pck.hdr.type = KOTI_TYPE_PSU;
-	pck.psu.percentage = percentage;
-	pck.psu.type = type;
-	pck.psu.cells = cells;
-	pck.psu.voltage = voltage;
-	memcpy(pck.uuid, uuid, sizeof(uuid));
-	nrf24l01p_koti_send(&pck);
 }
 
 int main(void)
@@ -184,7 +197,7 @@ int main(void)
 
 #ifdef TARGET_PIC8
 	uint16_t send_timer = SEND_DELAY;
-	uint16_t send_timer_battery = SEND_DELAY_BATTERY;
+	uint16_t send_timer_battery = SEND_DELAY_BATTERY + 1;
 
 	while (1) {
 		SYSCMD = 1;
@@ -195,19 +208,21 @@ int main(void)
 			TMR0IF = 0;
 
 			send_timer--;
-			// send_timer_battery--;
-
 			if (send_timer == 0) {
 				send_timer = SEND_DELAY;
 				drivers[driver_index].read(&dev, &temperature, &humidity);
 				send_th();
 			}
 
+#if defined(MCU_16LF18446)
+			send_timer_battery--;
 			if (send_timer_battery == 0) {
 				uint8_t percentage = 0;
 				float voltage = (2048.0 * 2048.0 * 16.0) / 1000.0;
 
 				send_timer_battery = SEND_DELAY_BATTERY;
+
+				send_battery(percentage, KOTI_PSU_BATTERY_ALKALINE, 2, voltage);
 
 				/* enable adc/fvr */
 				FVRMD = 0;
@@ -242,9 +257,8 @@ int main(void)
 				/* disable adc/fvr */
 				ADCMD = 1;
 				FVRMD = 1;
-
-				send_battery(percentage, KOTI_PSU_BATTERY_LITHIUM, 1, voltage);
 			}
+#endif
 		}
 	}
 #else
