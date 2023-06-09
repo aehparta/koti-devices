@@ -69,27 +69,29 @@ while True:
             mqtt.publish(f'sensor/{uuid}/psu/cells', cells)
         mqtt.publish(f'sensor/{uuid}/psu/voltage', voltage)
 
-    # water flown
+    # water flow
     if type in [KOTI_TYPE_WATER_FLOW_LITRE, KOTI_TYPE_WATER_FLOW_MILLILITRE]:
         (value,) = struct.unpack_from('<Q', data, 0)
         if type == KOTI_TYPE_WATER_FLOW_MILLILITRE:
             value /= 1000.0
-        mqtt.publish(f'sensor/{uuid}/water/state', value)
+        mqtt.publish(f'sensor/{uuid}/water', value)
 
     # temperature and humidity
     if type == KOTI_TYPE_TH:
         (t, h,) = struct.unpack_from('<ff', data, 0)
-        mqtt.publish(f'sensor/{uuid}/temperature/state', t)
-        mqtt.publish(f'sensor/{uuid}/humidity/state', h)
+        mqtt.publish(f'sensor/{uuid}/temperature', f'{t:0.1f}')
+        mqtt.publish(f'sensor/{uuid}/humidity', f'{h:0.0f}')
+        mqtt.ha_config(uuid, f'sensor/{uuid}/temperature', 'temperature', '°C')
+        mqtt.ha_config(uuid, f'sensor/{uuid}/humidity', 'humidity', '%')
 
     # extremely simple click
     if type == KOTI_TYPE_CLICK:
-        mqtt.publish(f'sensor/{uuid}/click/state', 'CLICK')
+        mqtt.publish(f'sensor/{uuid}/click', 'CLICK')
 
     # count of something
     if type == KOTI_TYPE_COUNT:
         (value,) = struct.unpack_from('<Q', data, 0)
-        mqtt.publish(f'sensor/{uuid}/count/state', value)
+        mqtt.publish(f'sensor/{uuid}/count', value)
 
     # debug
     if type == KOTI_TYPE_DEBUG:

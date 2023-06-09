@@ -3,7 +3,7 @@ mqtt:
   port: 1883
   username:
   password:
-  prefix: testing/
+  prefix: homeassistant/
 
 devices:
   # water usage
