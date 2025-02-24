@@ -38,14 +38,15 @@ struct driver {
 	char *name;
 	int8_t (*open)(struct i2c_device *dev, struct i2c_master *master, int32_t reference, int32_t resolution);
 	int8_t (*read)(struct i2c_device *dev, float *t, float *h);
+	int32_t resolution;
 };
 
 struct driver drivers[] = {
 	/* this must be before sht21, they have same address and only hdc1080 can be detected */
-	{ "hdc1080", hdc1080_open, hdc1080_read },
-	{ "sht21", sht21_open, sht21_read },
-	{ "sht31", sht31_open, sht31_read },
-	{ NULL, NULL, NULL }
+	{ "hdc1080", hdc1080_open, hdc1080_read, 0 },
+	{ "sht31", sht31_open, sht31_read, 0 },
+	{ "sht21", sht21_open, sht21_read, 12 },
+	{ NULL, NULL, NULL, 0 }
 };
 
 
@@ -63,7 +64,6 @@ void send_debug(char *data)
 
 void send_th(void)
 {
-	DEBUG_MSG("t&h send, t: %f, h: %f", temperature, humidity);
 	memset(&pck, 0, sizeof(pck) - sizeof(uuid));
 	pck.hdr.src = KOTI_NRF_ADDR_BROADCAST;
 	pck.hdr.dst = KOTI_NRF_ADDR_CTRL;
@@ -94,8 +94,6 @@ void p_init(void)
 {
 	/* very low level platform initialization */
 	os_init();
-	/* debug/log init */
-	log_init();
 
 #ifdef TARGET_PIC8
 	/* switch to 32MHz clock */
@@ -104,27 +102,6 @@ void p_init(void)
 	OSCEN = 0x00;
 	OSCFRQ = 0x06;
 	OSCTUNE = 0x00;
-
-	/* all unused gpios as output and low to save power */
-	gpio_output(GPIOA0);
-	gpio_low(GPIOA0);
-	gpio_output(GPIOA1);
-	gpio_low(GPIOA1);
-	gpio_output(GPIOA2);
-	gpio_low(GPIOA2);
-	gpio_output(GPIOA4);
-	gpio_low(GPIOA4);
-	gpio_output(GPIOA5);
-	gpio_low(GPIOA5);
-
-	gpio_output(GPIOC0);
-	gpio_low(GPIOC0);
-	gpio_output(GPIOC3);
-	gpio_low(GPIOC3);
-	gpio_output(GPIOC4);
-	gpio_low(GPIOC4);
-	gpio_output(GPIOC5);
-	gpio_low(GPIOC5);
 
 	/* disable all modules and enable only needed parts to save power */
 	PMD0 = 0xff;
@@ -142,6 +119,15 @@ void p_init(void)
 	SYSCMD = 0;
 	MSSP1MD = 0;
 	TMR0MD = 0;
+#ifdef USE_LOG
+	U1MD = 0;
+	log_init();
+#endif
+
+	/* following pins can be used for other things, so they must be set high not to draw extra current */
+	gpio_high(GPIOA4);
+	gpio_high(GPIOC4);
+	gpio_high(GPIOC5);
 
 	/* timer 0 setup */
 	TMR0L = 0;
@@ -182,11 +168,15 @@ void p_init(void)
 	i2c_master_open(&i2c, NULL, 0, 0, 0);
 	/* try to find a temperature and humidity chip */
 	for (driver_index = 0; drivers[driver_index].open; driver_index++) {
-		if (!drivers[driver_index].open(&dev, &i2c, 0, 0)) {
+		os_delay_ms(1);
+		if (!drivers[driver_index].open(&dev, &i2c, 0, drivers[driver_index].resolution)) {
 			DEBUG_MSG("i2c t&h chip found: %s", drivers[driver_index].name);
 			send_debug(drivers[driver_index].name);
 			break;
 		}
+	}
+	if (!drivers[driver_index].open) {
+		driver_index = 0xff;
 	}
 }
 
@@ -210,55 +200,59 @@ int main(void)
 			send_timer--;
 			if (send_timer == 0) {
 				send_timer = SEND_DELAY;
-				drivers[driver_index].read(&dev, &temperature, &humidity);
-				send_th();
-			}
-
-#if defined(MCU_16LF18446)
-			send_timer_battery--;
-			if (send_timer_battery == 0) {
-				uint8_t percentage = 0;
-				float voltage = (2048.0 * 2048.0 * 16.0) / 1000.0;
-
-				send_timer_battery = SEND_DELAY_BATTERY;
-
-				send_battery(percentage, KOTI_PSU_BATTERY_ALKALINE, 2, voltage);
-
-				/* enable adc/fvr */
-				FVRMD = 0;
-				ADCMD = 0;
-				while (!FVRRDY) {}
-				FVRCON = 0x81;
-				ADPCH = 0x3e;
-				ADCLK = 2;
-				ADCON0 = 0x80;
-
-				/* do one conversion before actual conversion, for some reason things are not stable yet */
-				ADCON0bits.GO = 1;
-				while (ADCON0bits.GO) {}
-
-				/* calculate battery voltage with 100mV precision */
-				ADCON0bits.GO = 1;
-				while (ADCON0bits.GO) {}
-
-				/* (2048 * 2048 * 16) / ADRES = millivolts:
-				 *  - ADRES = 22370 = 3.0V or ADRESH = 87
-				 *  - ADRES = 23140 = 2.9V
-				 *  - ADRES = 23967 = 2.8V
-				 *  - ADRES = 33554 = 2.0V
-				 *  - ADRES = 35320 = 1.9V or ADRESH = 137
-				 */
-				if (ADRESH <= 137) {
-					percentage = 137 - (ADRESH);
-					percentage = percentage < 50 ? percentage * 2 : 100;
+				if (driver_index < 0xff) {
+					drivers[driver_index].read(&dev, &temperature, &humidity);
+					send_th();
+				} else {
+					send_debug("err:t&h");
 				}
-				voltage /= (float)ADRES;
-
-				/* disable adc/fvr */
-				ADCMD = 1;
-				FVRMD = 1;
 			}
-#endif
+
+			// #if defined(MCU_16LF18446)
+			// 			send_timer_battery--;
+			// 			if (send_timer_battery == 0) {
+			// 				uint8_t percentage = 0;
+			// 				float voltage = (2048.0 * 2048.0 * 16.0) / 1000.0;
+
+			// 				send_timer_battery = SEND_DELAY_BATTERY;
+
+			// 				send_battery(percentage, KOTI_PSU_BATTERY_ALKALINE, 2, voltage);
+
+			// 				/* enable adc/fvr */
+			// 				FVRMD = 0;
+			// 				ADCMD = 0;
+			// 				while (!FVRRDY) {}
+			// 				FVRCON = 0x81;
+			// 				ADPCH = 0x3e;
+			// 				ADCLK = 2;
+			// 				ADCON0 = 0x80;
+
+			// 				/* do one conversion before actual conversion, for some reason things are not stable yet */
+			// 				ADCON0bits.GO = 1;
+			// 				while (ADCON0bits.GO) {}
+
+			// 				/* calculate battery voltage with 100mV precision */
+			// 				ADCON0bits.GO = 1;
+			// 				while (ADCON0bits.GO) {}
+
+			// 				/* (2048 * 2048 * 16) / ADRES = millivolts:
+			// 				 *  - ADRES = 22370 = 3.0V or ADRESH = 87
+			// 				 *  - ADRES = 23140 = 2.9V
+			// 				 *  - ADRES = 23967 = 2.8V
+			// 				 *  - ADRES = 33554 = 2.0V
+			// 				 *  - ADRES = 35320 = 1.9V or ADRESH = 137
+			// 				 */
+			// 				if (ADRESH <= 137) {
+			// 					percentage = 137 - (ADRESH);
+			// 					percentage = percentage < 50 ? percentage * 2 : 100;
+			// 				}
+			// 				voltage /= (float)ADRES;
+
+			// 				/* disable adc/fvr */
+			// 				ADCMD = 1;
+			// 				FVRMD = 1;
+			// 			}
+			// #endif
 		}
 	}
 #else
